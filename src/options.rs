@@ -1,0 +1,71 @@
+//! Rendering options shared by every `Renderer` impl.
+
+use crate::board::{Color, Square};
+
+/// Output format a renderer produces. `Png`/`Typst` are added here later —
+/// additively, which is why the enum is non-exhaustive.
+#[non_exhaustive]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Format {
+    Svg,
+}
+
+/// Square colors. Defaults match the familiar lichess brown board.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Theme {
+    pub light: String,
+    pub dark: String,
+}
+
+impl Default for Theme {
+    fn default() -> Self {
+        Theme {
+            light: "#f0d9b5".into(),
+            dark: "#b58863".into(),
+        }
+    }
+}
+
+/// How to draw the diagram; `Options::default()` is a sensible board.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Options {
+    /// Board point of view (default: White at the bottom).
+    pub orientation: Color,
+    /// Squares to highlight, e.g. last-move from/to.
+    pub highlight: Vec<Square>,
+    /// King-in-check square, drawn with a warning tint.
+    pub check: Option<Square>,
+    /// Draw file/rank labels.
+    pub coordinates: bool,
+    /// Rendered edge length in SVG px.
+    pub size: u32,
+    pub theme: Theme,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            orientation: Color::White,
+            highlight: Vec::new(),
+            check: None,
+            coordinates: true,
+            size: 360,
+            theme: Theme::default(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_options_are_sane() {
+        let opts = Options::default();
+        assert_eq!(opts.orientation, Color::White);
+        assert!(opts.highlight.is_empty());
+        assert_eq!(opts.check, None);
+        assert!(opts.coordinates);
+        assert!(opts.size > 0);
+    }
+}

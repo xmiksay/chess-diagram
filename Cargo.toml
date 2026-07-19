@@ -1,0 +1,20 @@
+[package]
+name = "chess-diagram"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Render a chess position (FEN) to a self-contained SVG diagram. Pure Rust, no native deps."
+repository = "https://github.com/xmiksay/chess-diagram"
+readme = "README.md"
+keywords = ["chess", "fen", "svg", "diagram", "board"]
+categories = ["visualization", "rendering", "game-development"]
+
+[features]
+default = ["svg"]
+svg = []
+# Future, added only when a real consumer asks (PROJECT_PLAN.md §10):
+# pgn = ["dep:shakmaty"]    # walk a PGN to move N → FEN
+# png = ["svg", "dep:resvg"] # rasterise SVG → PNG bytes
+
+[dependencies]
+thiserror = "2"
