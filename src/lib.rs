@@ -20,6 +20,8 @@
 mod board;
 mod fen;
 mod options;
+#[cfg(feature = "svg")]
+mod pieces;
 mod render;
 
 pub use board::{Board, Color, Piece, Role, Square};

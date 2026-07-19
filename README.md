@@ -60,5 +60,9 @@ make gallery    # render sample boards to target/gallery/*.svg
 
 ## License
 
-MIT. Piece artwork (Phase 1) will vendor the Cburnett set under its BSD
-license, with the notice shipped in `assets/LICENSE-pieces`.
+MIT (see [LICENSE](LICENSE)) for the crate itself.
+
+The bundled piece artwork is the **Cburnett** set by Colin M. L. Burnett,
+vendored as inline SVG in `src/pieces.rs` and used under its BSD license —
+the full notice and attribution ship in
+[assets/LICENSE-pieces](assets/LICENSE-pieces).
