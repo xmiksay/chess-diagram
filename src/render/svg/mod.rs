@@ -1,11 +1,12 @@
 //! Hand-emitted SVG renderer — strings only, no dependencies.
 //!
-//! Emits the board grid ([`grid`], orientation- and theme-aware) with the
-//! Cburnett pieces (`crate::pieces`) placed on top, then coordinate labels
-//! ([`coordinates`]) when enabled. The viewBox is `0 0 360 360` — 45 SVG
-//! units per square, matching the Cburnett glyphs' native 45×45 coordinate
-//! system exactly — so squares and glyphs both use integral coordinates and
-//! pieces need only a `translate`, no `scale`.
+//! Emits the board grid ([`grid`], orientation- and theme-aware), single-
+//! square annotations ([`shapes`]) and the Cburnett pieces (`crate::pieces`),
+//! then straight arrows ([`arrows`]) on top of the pieces and finally
+//! coordinate labels ([`coordinates`]) when enabled. The viewBox is
+//! `0 0 360 360` — 45 SVG units per square, matching the Cburnett glyphs'
+//! native 45×45 coordinate system exactly — so squares and glyphs both use
+//! integral coordinates and pieces need only a `translate`, no `scale`.
 
 use std::fmt::Write;
 
@@ -14,6 +15,7 @@ use crate::options::{Format, Options};
 use crate::pieces;
 use crate::render::Renderer;
 
+mod arrows;
 mod coordinates;
 mod grid;
 mod shapes;
@@ -58,6 +60,7 @@ impl Renderer for SvgRenderer {
             out,
             r#"<svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 {viewbox} {viewbox}">"#
         );
+        arrows::write_defs(&mut out, opts);
         grid::draw_squares(&mut out, opts);
         for square in &opts.highlight {
             grid::draw_overlay(&mut out, *square, opts, &opts.theme.highlight);
@@ -80,6 +83,7 @@ impl Renderer for SvgRenderer {
                 let _ = write!(out, r#"<g transform="translate({x} {y})">{glyph}</g>"#);
             }
         }
+        arrows::draw_arrows(&mut out, opts);
         if opts.coordinates {
             coordinates::write_coordinates(&mut out, opts);
         }

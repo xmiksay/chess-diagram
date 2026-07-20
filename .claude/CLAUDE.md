@@ -19,12 +19,15 @@ Two layers behind one seam:
   one impl. v1 ships `SvgRenderer` (`src/render/svg/`, hand-emitted SVG
   strings, `#[cfg(feature = "svg")]`), split into `mod.rs` (orchestration +
   shared geometry incl. `square_center`), `grid.rs` (base squares +
-  highlight/check overlays), `coordinates.rs` (file/rank labels), and
-  `shapes.rs` (`Options::shapes` annotations — circles today, drawn between
-  the overlays and the pieces). `src/options.rs` holds
-  `Options`/`Theme`/`Format` shared by all impls; `src/annotation.rs` holds
-  the `Shape`/`ArrowShape` annotation model (mirrors chessground's `Shape` —
-  not part of `board.rs`, since annotations are a rendering concern).
+  highlight/check overlays), `coordinates.rs` (file/rank labels), `shapes.rs`
+  (`Options::shapes` single-square annotations — circles today, drawn between
+  the overlays and the pieces), and `arrows.rs` (straight arrows for
+  `Shape::dest`, drawn above the pieces: a `<marker>`-per-brush-color `<defs>`
+  block right after the `<svg>` header, then a `<line>` per arrow with
+  `marker-end`). `src/options.rs` holds `Options`/`Theme`/`Format` shared by
+  all impls; `src/annotation.rs` holds the `Shape`/`ArrowShape` annotation
+  model (mirrors chessground's `Shape` — not part of `board.rs`, since
+  annotations are a rendering concern).
 
 Extension seams:
 - **New output format** = new `Format` variant (the enum is
@@ -50,6 +53,7 @@ Extension seams:
 | 2 | Publish 0.1 to crates.io | done |
 | 3 | Split `src/render/svg.rs` into `src/render/svg/` submodule (annotations prereq) | done |
 | 3 | Annotation model (`src/annotation.rs`: `Shape`/`ArrowShape`) + `Options::shapes` + brush palette (`Theme::{green,red,blue,yellow}`, `Theme::resolve_brush`) + circle rendering | done |
+| 3 | Straight arrows (`Shape::dest` + `Straight`/non-knight `Auto`, `src/render/svg/arrows.rs`) rendered above the pieces | done |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
 ## Build & test

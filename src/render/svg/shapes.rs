@@ -1,10 +1,11 @@
-//! Annotation shapes (`Options::shapes`), drawn between the highlight/check
-//! overlays and the pieces so a shape never hides the piece sitting on it.
+//! Single-square annotation shapes (`Options::shapes`), drawn between the
+//! highlight/check overlays and the pieces so a shape never hides the piece
+//! sitting on it. Arrows (`Shape::dest` set) render above the pieces
+//! instead — see `super::arrows`.
 //!
-//! Only single-square circles (`dest: None`, `text: None`) render in this
-//! phase; arrows and text badges are later shape kinds. A shape with an
-//! unresolvable `orig`, or one that isn't a circle yet, is silently skipped
-//! — `render` stays infallible.
+//! Only circles (`dest: None`, `text: None`) render here; text badges are a
+//! later shape kind. A shape with an unresolvable `orig`, or one that isn't
+//! a circle, is silently skipped — `render` stays infallible.
 
 use std::fmt::Write;
 

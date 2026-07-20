@@ -20,6 +20,17 @@ fn circle(orig: &str, brush: &str) -> Shape {
     }
 }
 
+/// A straight-arrow annotation from `orig` to `dest`, brush-colored.
+fn arrow(orig: &str, dest: &str, brush: &str) -> Shape {
+    Shape {
+        orig: orig.into(),
+        dest: Some(dest.into()),
+        brush: brush.into(),
+        text: None,
+        arrow: ArrowShape::Straight,
+    }
+}
+
 /// The full golden-test set (`tests/golden/<name>.svg`).
 pub fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
     vec![
@@ -68,6 +79,18 @@ pub fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
                     circle("e4", "green"),
                     circle("e5", "red"),
                     circle("c5", "#8338ec"),
+                ],
+                ..Options::default()
+            },
+        ),
+        (
+            "arrows",
+            START_FEN,
+            Options {
+                shapes: vec![
+                    arrow("e2", "e4", "green"),
+                    arrow("g1", "f3", "blue"),
+                    arrow("d1", "h5", "red"),
                 ],
                 ..Options::default()
             },
