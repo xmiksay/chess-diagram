@@ -2,7 +2,7 @@ export CARGO_BUILD_JOBS ?= 4
 
 .DEFAULT_GOAL := help
 .PHONY: help build check fmt lint test test-unit test-integration test-doc \
-        gallery doc package verify clean
+        gallery doc package verify clean golden-update
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -30,6 +30,9 @@ test-doc: ## Doctests (lib.rs examples)
 	cargo test --doc
 
 test: test-unit test-integration test-doc ## All tests (unit + integration + doctest)
+
+golden-update: ## Rewrite tests/golden/*.svg fixtures from the current renderer output
+	UPDATE_GOLDEN=1 cargo test --test '*'
 
 gallery: ## Render sample boards to target/gallery/*.svg
 	cargo run --example gallery

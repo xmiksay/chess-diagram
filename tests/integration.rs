@@ -1,22 +1,62 @@
 //! End-to-end: FEN in, standalone SVG out, through the public API only.
-//! Each sample is also written to `target/test-samples/<name>.svg` for
-//! eyeballing; Phase 1 replaces the structural asserts with golden snapshots.
+//!
+//! Each fixture also writes an eyeball copy to `target/test-samples/<name>.svg`.
+//! The golden fixtures under `tests/golden/<name>.svg` lock the exact
+//! rendered bytes so a renderer regression fails loudly instead of drifting
+//! silently. Regenerate after an intentional rendering change with
+//! `UPDATE_GOLDEN=1 cargo test` (or `make golden-update`).
 
-use chess_diagram::{render_svg, Color, Options};
+use chess_diagram::{render_svg, Color, Options, Square};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-const SAMPLES: &[(&str, &str)] = &[
-    (
-        "start",
-        "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-    ),
-    (
-        "midgame",
-        "r1bqk2r/pp2bppp/2n2n2/2pp4/4P3/2NP1N2/PPP2PPP/R1BQKB1R w KQkq - 0 7",
-    ),
-    ("mate", "6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 1"),
-];
+const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+
+fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
+    vec![
+        ("start", START_FEN, Options::default()),
+        (
+            "midgame",
+            "r1bqk2r/pp2bppp/2n2n2/2pp4/4P3/2NP1N2/PPP2PPP/R1BQKB1R w KQkq - 0 7",
+            Options::default(),
+        ),
+        (
+            "mate",
+            "6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 1",
+            Options {
+                check: Square::from_algebraic("g8"),
+                ..Options::default()
+            },
+        ),
+        (
+            "flipped",
+            START_FEN,
+            Options {
+                orientation: Color::Black,
+                ..Options::default()
+            },
+        ),
+        (
+            "highlight",
+            "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
+            Options {
+                highlight: vec![
+                    Square::from_algebraic("e2").expect("valid square"),
+                    Square::from_algebraic("e4").expect("valid square"),
+                ],
+                ..Options::default()
+            },
+        ),
+        (
+            "no-coords",
+            START_FEN,
+            Options {
+                coordinates: false,
+                ..Options::default()
+            },
+        ),
+    ]
+}
 
 fn assert_valid_svg(name: &str, svg: &str) {
     assert!(svg.starts_with("<svg "), "{name}: not an svg root");
@@ -28,31 +68,91 @@ fn assert_valid_svg(name: &str, svg: &str) {
     assert!(!svg.contains("href"), "{name}: external reference found");
 }
 
+fn golden_path(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/golden")
+        .join(format!("{name}.svg"))
+}
+
+/// Compares `actual` byte-for-byte against the committed fixture for `name`.
+/// With `UPDATE_GOLDEN=1` set, rewrites the fixture instead of comparing —
+/// the accepted flow for landing an intentional rendering change.
+fn assert_matches_golden(name: &str, actual: &str) {
+    let path = golden_path(name);
+    if std::env::var_os("UPDATE_GOLDEN").is_some() {
+        fs::write(&path, actual)
+            .unwrap_or_else(|e| panic!("failed to write golden {}: {e}", path.display()));
+        return;
+    }
+    let expected = fs::read_to_string(&path).unwrap_or_else(|e| {
+        panic!(
+            "failed to read golden {} ({e}); run `UPDATE_GOLDEN=1 cargo test` to create it",
+            path.display()
+        )
+    });
+    if actual != expected {
+        panic!(
+            "golden mismatch for `{name}` ({}):\n{}\nrun `UPDATE_GOLDEN=1 cargo test` (or `make golden-update`) to accept this output",
+            path.display(),
+            diff_hint(&expected, actual),
+        );
+    }
+}
+
+/// Short hint for a golden mismatch: byte offset and a snippet either side of
+/// the first difference, or a length note if one is a prefix of the other.
+fn diff_hint(expected: &str, actual: &str) -> String {
+    let mismatch = expected
+        .as_bytes()
+        .iter()
+        .zip(actual.as_bytes())
+        .position(|(a, b)| a != b);
+    let Some(at) = mismatch else {
+        return format!(
+            "expected {} bytes, actual {} bytes (one is a prefix of the other)",
+            expected.len(),
+            actual.len()
+        );
+    };
+    const CTX: usize = 30;
+    format!(
+        "first difference at byte {at}:\n  expected: ...{}...\n  actual:   ...{}...",
+        snippet(expected, at, CTX),
+        snippet(actual, at, CTX),
+    )
+}
+
+/// `ctx` bytes of `s` on either side of `at`, clamped to the string bounds.
+fn snippet(s: &str, at: usize, ctx: usize) -> &str {
+    let start = at.saturating_sub(ctx);
+    let end = (at + ctx).min(s.len());
+    &s[start..end]
+}
+
 #[test]
-fn samples_render_to_standalone_svg() {
+fn golden_snapshots_match_committed_fixtures() {
     let out_dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("../test-samples");
     fs::create_dir_all(&out_dir).expect("create test-samples dir");
 
-    for (name, fen) in SAMPLES {
-        let svg = render_svg(fen, &Options::default()).expect(name);
+    for (name, fen, opts) in golden_scenarios() {
+        let svg = render_svg(fen, &opts).expect(name);
         assert_valid_svg(name, &svg);
         fs::write(out_dir.join(format!("{name}.svg")), &svg).expect("write sample");
+        assert_matches_golden(name, &svg);
     }
 }
 
 #[test]
 fn flipped_board_renders_and_differs() {
-    let (name, fen) = SAMPLES[0];
-    let white = render_svg(fen, &Options::default()).expect(name);
+    let white = render_svg(START_FEN, &Options::default()).expect("start");
     let black = render_svg(
-        fen,
+        START_FEN,
         &Options {
             orientation: Color::Black,
             ..Options::default()
         },
     )
-    .expect(name);
-    assert_valid_svg("flipped", &black);
+    .expect("start");
     assert_ne!(white, black);
 }
 

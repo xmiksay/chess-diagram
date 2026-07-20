@@ -36,7 +36,7 @@ Extension seams:
 | 1 | Full SVG: Cburnett pieces (`src/pieces.rs`) placed on the grid | done |
 | 1 | Coordinate labels (`Options::coordinates`) | done |
 | 1 | Highlight/check squares (`Options::highlight`/`check`) | done |
-| 1 | Golden-test harness | todo |
+| 1 | Golden-test harness | done |
 | 2 | README gallery, docs, publish 0.1 to crates.io | todo |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
@@ -51,14 +51,21 @@ make test               # all tests (unit + integration + doctest)
 make lint               # cargo fmt --check + clippy --all-targets -D warnings
 make verify             # lint + test — the hard gate before any push
 make gallery            # render sample boards to target/gallery/*.svg
+make golden-update      # rewrite tests/golden/*.svg from current renderer output
 make package            # cargo package --allow-dirty
 ```
 
 `CARGO_BUILD_JOBS` is pinned to 4 in the Makefile (override per invocation).
 
 Integration tests (`tests/integration.rs`) write one sample SVG per fixture to
-`target/test-samples/<name>.svg` for eyeballing. Phase 1 replaces the
-structural asserts there with golden snapshots under `tests/golden/`.
+`target/test-samples/<name>.svg` for eyeballing, and byte-compare each render
+against a committed fixture under `tests/golden/<name>.svg` (`start`,
+`midgame`, `mate`, `flipped`, `highlight`, `no-coords`). A mismatch panics
+with the fixture path and a snippet around the first differing byte. After an
+*intentional* rendering change, regenerate the fixtures with
+`UPDATE_GOLDEN=1 cargo test` (or `make golden-update`), then diff-review the
+changed `tests/golden/*.svg` files before committing — a stale-looking diff
+there is the signal a regression slipped in unreviewed.
 
 ## Conventions
 
