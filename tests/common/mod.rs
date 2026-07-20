@@ -2,7 +2,7 @@
 //! and the README gallery generator (`examples/gallery.rs`) — one sample set,
 //! not two. Included by both via `#[path]`.
 
-use chess_diagram::{ArrowShape, Color, Options, Shape, Square};
+use chess_diagram::{ArrowShape, Color, Options, Shape, Square, Theme};
 
 pub const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 pub const MIDGAME_FEN: &str = "r1bqk2r/pp2bppp/2n2n2/2pp4/4P3/2NP1N2/PPP2PPP/R1BQKB1R w KQkq - 0 7";
@@ -172,6 +172,22 @@ pub fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
                     text_badge("e5", "?", "red"),
                     arrow_with_text("g1", "f3", "+3.2", "blue"),
                 ],
+                ..Options::default()
+            },
+        ),
+        (
+            "theme-blue",
+            START_FEN,
+            Options {
+                theme: Theme::blue(),
+                ..Options::default()
+            },
+        ),
+        (
+            "theme-green",
+            START_FEN,
+            Options {
+                theme: Theme::green(),
                 ..Options::default()
             },
         ),

@@ -68,6 +68,39 @@ the file.
 </td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/check.svg" width="240" alt="King in check on g8"></td></tr>
 </table>
 
+## Themes
+
+`Theme` is hand-constructible (set any field directly), and ships three
+named presets for the common board palettes — `Theme::brown()` (the
+default), `Theme::blue()`, and `Theme::green()`. Only the square colors
+change between presets; highlight/check overlay tints and annotation
+brushes stay the same:
+
+```rust
+use chess_diagram::{render_svg, Options, Theme};
+
+let opts = Options {
+    theme: Theme::blue(),
+    ..Options::default()
+};
+let svg = render_svg("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", &opts)?;
+```
+
+<table>
+<tr><td>
+
+`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`<br>
+`Options { theme: Theme::blue(), ..Default::default() }`
+
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/theme-blue.svg" width="240" alt="Start position with the blue board theme"></td></tr>
+<tr><td>
+
+`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`<br>
+`Options { theme: Theme::green(), ..Default::default() }`
+
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/theme-green.svg" width="240" alt="Start position with the green board theme"></td></tr>
+</table>
+
 ## Annotations
 
 `Options::shapes` draws study-style overlays — circles, arrows (straight or
