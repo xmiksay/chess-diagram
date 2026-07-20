@@ -4,12 +4,6 @@ Render a chess **position** (a FEN string) to a static, self-contained **SVG**
 diagram — inline, no client JS, no Node/Chromium, no native dependencies.
 Pure Rust; the default build depends on `thiserror` and nothing else.
 
-> **Status: Phase 1 (complete)** — model, FEN parse, and the `Renderer` seam
-> are in place; the SVG renderer places the Cburnett pieces on the board
-> grid, draws file/rank coordinate labels, tints highlight/check squares, and
-> is locked in by a byte-stable golden-test harness (see
-> [PROJECT_PLAN.md](PROJECT_PLAN.md)).
-
 ## Usage
 
 ```rust

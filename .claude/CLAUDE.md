@@ -41,7 +41,7 @@ Extension seams:
 | 2 | Rustdoc pass: crate docs, doc examples, `#![warn(missing_docs)]` | done |
 | 2 | Package metadata + contents + license hygiene (`Cargo.toml` `exclude`, README image URLs) | done |
 | 2 | Release workflow: tag-triggered, crates.io Trusted Publishing (OIDC) | done |
-| 2 | Publish 0.1 to crates.io | todo |
+| 2 | Publish 0.1 to crates.io | done |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
 ## Build & test
@@ -97,6 +97,14 @@ To cut a release:
 One-time setup (already documented in the workflow header comment): the
 crates.io trusted publisher for `xmiksay/chess-diagram` must be configured
 with workflow filename `release.yml` before the first tag push.
+
+**Note:** `0.1.0` was published manually (`cargo publish`) — the trusted
+publisher for `xmiksay/chess-diagram` was not registered before the `v0.1.0`
+tag push, so `release.yml`'s OIDC token exchange failed with "No Trusted
+Publishing config found for repository". The crate now exists on crates.io,
+so the trusted publisher can be added from its Settings page (step 2 in the
+workflow header) before the next tag push, restoring the tag-triggered flow
+for `0.2.0`+.
 
 ## Conventions
 
