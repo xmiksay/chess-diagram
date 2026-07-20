@@ -9,11 +9,6 @@
 //! no `<svg>` wrapper, no `id`/`class` attributes — so it survives being
 //! inlined into the board `<svg>` 32 times without collisions or external
 //! references. See `../assets/LICENSE-pieces` for the BSD notice.
-//!
-//! `glyph` is currently exercised only by tests; the SVG renderer wires it in
-//! during the rest of Phase 1 (issue #6). The module-level `dead_code` allow
-//! keeps `clippy -D warnings` green until then.
-#![allow(dead_code)]
 
 use crate::board::{Color, Piece, Role};
 
