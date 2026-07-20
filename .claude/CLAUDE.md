@@ -37,7 +37,8 @@ Extension seams:
 | 1 | Coordinate labels (`Options::coordinates`) | done |
 | 1 | Highlight/check squares (`Options::highlight`/`check`) | done |
 | 1 | Golden-test harness | done |
-| 2 | README gallery, docs, publish 0.1 to crates.io | todo |
+| 2 | README gallery (`assets/gallery/`) + freshness test | done |
+| 2 | Docs polish, publish 0.1 to crates.io | todo |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
 ## Build & test
@@ -50,7 +51,7 @@ make check              # fast typecheck of all targets
 make test               # all tests (unit + integration + doctest)
 make lint               # cargo fmt --check + clippy --all-targets -D warnings
 make verify             # lint + test — the hard gate before any push
-make gallery            # render sample boards to target/gallery/*.svg
+make gallery            # regenerate the README gallery under assets/gallery/*.svg
 make golden-update      # rewrite tests/golden/*.svg from current renderer output
 make package            # cargo package --allow-dirty
 ```
@@ -66,6 +67,13 @@ with the fixture path and a snippet around the first differing byte. After an
 `UPDATE_GOLDEN=1 cargo test` (or `make golden-update`), then diff-review the
 changed `tests/golden/*.svg` files before committing — a stale-looking diff
 there is the signal a regression slipped in unreviewed.
+
+The README gallery reuses the same sample set (`tests/common/mod.rs`, shared
+by `tests/integration.rs` and `examples/gallery.rs` via `#[path]`) rendered to
+`assets/gallery/<name>.svg` and embedded in `README.md`. The
+`doc_gallery_up_to_date` test byte-compares each render against the committed
+file and fails naming the stale one; regenerate with `make gallery`, then
+diff-review before committing.
 
 ## Conventions
 

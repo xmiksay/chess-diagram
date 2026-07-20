@@ -34,7 +34,7 @@ test: test-unit test-integration test-doc ## All tests (unit + integration + doc
 golden-update: ## Rewrite tests/golden/*.svg fixtures from the current renderer output
 	UPDATE_GOLDEN=1 cargo test --test '*'
 
-gallery: ## Render sample boards to target/gallery/*.svg
+gallery: ## Regenerate the README gallery under assets/gallery/*.svg
 	cargo run --example gallery
 
 doc: ## Build rustdoc

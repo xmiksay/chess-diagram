@@ -5,58 +5,17 @@
 //! rendered bytes so a renderer regression fails loudly instead of drifting
 //! silently. Regenerate after an intentional rendering change with
 //! `UPDATE_GOLDEN=1 cargo test` (or `make golden-update`).
+//!
+//! `doc_gallery_up_to_date` locks the README gallery under `assets/gallery/`
+//! the same way — regenerate with `make gallery` after a rendering change.
 
-use chess_diagram::{render_svg, Color, Options, Square};
+use chess_diagram::{render_svg, Color, Options};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
-
-fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
-    vec![
-        ("start", START_FEN, Options::default()),
-        (
-            "midgame",
-            "r1bqk2r/pp2bppp/2n2n2/2pp4/4P3/2NP1N2/PPP2PPP/R1BQKB1R w KQkq - 0 7",
-            Options::default(),
-        ),
-        (
-            "mate",
-            "6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 1",
-            Options {
-                check: Square::from_algebraic("g8"),
-                ..Options::default()
-            },
-        ),
-        (
-            "flipped",
-            START_FEN,
-            Options {
-                orientation: Color::Black,
-                ..Options::default()
-            },
-        ),
-        (
-            "highlight",
-            "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2",
-            Options {
-                highlight: vec![
-                    Square::from_algebraic("e2").expect("valid square"),
-                    Square::from_algebraic("e4").expect("valid square"),
-                ],
-                ..Options::default()
-            },
-        ),
-        (
-            "no-coords",
-            START_FEN,
-            Options {
-                coordinates: false,
-                ..Options::default()
-            },
-        ),
-    ]
-}
+#[path = "common/mod.rs"]
+mod fixtures;
+use fixtures::START_FEN;
 
 fn assert_valid_svg(name: &str, svg: &str) {
     assert!(svg.starts_with("<svg "), "{name}: not an svg root");
@@ -134,11 +93,39 @@ fn golden_snapshots_match_committed_fixtures() {
     let out_dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("../test-samples");
     fs::create_dir_all(&out_dir).expect("create test-samples dir");
 
-    for (name, fen, opts) in golden_scenarios() {
+    for (name, fen, opts) in fixtures::golden_scenarios() {
         let svg = render_svg(fen, &opts).expect(name);
         assert_valid_svg(name, &svg);
         fs::write(out_dir.join(format!("{name}.svg")), &svg).expect("write sample");
         assert_matches_golden(name, &svg);
+    }
+}
+
+fn gallery_path(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("assets/gallery")
+        .join(format!("{name}.svg"))
+}
+
+/// Keeps `assets/gallery/*.svg` (embedded in `README.md`) in sync with the
+/// renderer: fails and names the stale file instead of letting the README
+/// drift silently. Regenerate with `make gallery`.
+#[test]
+fn doc_gallery_up_to_date() {
+    for (name, fen, opts) in fixtures::gallery_scenarios() {
+        let svg = render_svg(fen, &opts).expect(name);
+        let path = gallery_path(name);
+        let committed = fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "failed to read {} ({e}); run `make gallery` to create it",
+                path.display()
+            )
+        });
+        assert!(
+            svg == committed,
+            "assets/gallery/{name}.svg is stale — run `make gallery` and commit the diff\n{}",
+            diff_hint(&committed, &svg),
+        );
     }
 }
 
