@@ -44,9 +44,11 @@
 //! ([`parse`]) and the position model ([`Board`]/[`Piece`]/[`Square`]) know
 //! nothing about output formats — no format name and no SVG string ever
 //! appears there; every output format is instead one impl of the
-//! [`Renderer`] trait ([`SvgRenderer`] ships in v1), so adding a format
-//! (PNG, typst) is additive at that seam rather than a change to parsing or
-//! the model.
+//! [`Renderer`] trait ([`SvgRenderer`] ships in v1), so adding a
+//! string-producing format (typst) is additive at that seam rather than a
+//! change to parsing or the model. PNG rasterises `SvgRenderer`'s own output
+//! instead of being a second `Renderer` impl, since it produces bytes rather
+//! than a `String` (see `png::render_png`).
 //!
 //! # Features
 //!
@@ -54,6 +56,9 @@
 //!   dependencies beyond `thiserror`.
 //! - `pgn` (opt-in) — `pgn::board_at` walks a PGN mainline to a given ply
 //!   via `shakmaty`. Not part of the default build's dependency tree.
+//! - `png` (opt-in, implies `svg`) — `png::render_png` rasterises this
+//!   crate's own SVG output to PNG bytes via `resvg`. Not part of the
+//!   default build's dependency tree.
 #![warn(missing_docs)]
 
 mod annotation;
@@ -64,6 +69,8 @@ mod options;
 pub mod pgn;
 #[cfg(feature = "svg")]
 mod pieces;
+#[cfg(feature = "png")]
+pub mod png;
 mod render;
 
 pub use annotation::{ArrowShape, Shape};

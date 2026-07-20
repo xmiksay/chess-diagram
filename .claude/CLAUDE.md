@@ -1,10 +1,10 @@
 # chess-diagram
 
 Single-crate Rust library that renders a chess position (FEN) to a static,
-self-contained SVG diagram. Pure Rust — the default build depends on
-`thiserror` and nothing else. No I/O, no async: the core is a pure function
-`FEN → String`. Full design rationale and delivery plan live in
-[../PROJECT_PLAN.md](../PROJECT_PLAN.md).
+self-contained SVG diagram, with opt-in PNG rasterisation. Pure Rust — the
+default build depends on `thiserror` and nothing else. No I/O, no async: the
+core is a pure function `FEN → String`. Full design rationale and delivery
+plan live in [../PROJECT_PLAN.md](../PROJECT_PLAN.md).
 
 ## Architecture overview
 
@@ -54,13 +54,24 @@ Two layers behind one seam:
   and variations are skipped in full; stops at a result token). Errors are
   `PgnError`, a type separate from `FenError` — this module never touches
   the parse layer or its error contract.
+- **PNG layer** — `src/png.rs` (`#[cfg(feature = "png")]`, opt-in, implies
+  `svg`): `pub fn render_png(fen: &str, opts: &Options) -> Result<Vec<u8>,
+  PngError>` calls `render_svg` then rasterises the resulting SVG string with
+  `resvg`/`usvg`/`tiny-skia` into an `Options::size`-square `Pixmap`, encoded
+  to PNG bytes. Not a `Renderer` impl — `Renderer::render` returns a `String`,
+  this returns bytes, so it's a downstream conversion step over `SvgRenderer`'s
+  own output instead. Coordinate labels and text badges use `sans-serif`, so
+  `usvg::Options::fontdb` is populated via `fontdb::Database::load_system_fonts`
+  — glyph shapes (and thus exact pixel output) are environment-dependent, so
+  tests check structure (`size × size`, decodes as PNG) rather than golden
+  bytes. `PngError` is a third error type, separate from `FenError`/`PgnError`.
 
 Extension seams:
 - **New output format** = new `Format` variant (the enum is
   `#[non_exhaustive]`) + one new `Renderer` impl under `src/render/`. Never a
   parse-layer change.
-- **Heavier capability** = opt-in Cargo feature: `pgn` (gates `shakmaty`,
-  landed), `png` (gates `resvg`, still deferred). **The default feature set
+- **Heavier capability** = opt-in Cargo feature: `pgn` (gates `shakmaty`) and
+  `png` (gates `resvg`, implies `svg`), both landed. **The default feature set
   never gains a heavy dependency.**
 
 ## Status
@@ -84,7 +95,7 @@ Extension seams:
 | 3 | Arrow sizing: chessground-proportioned arrowhead (was 10× oversized), per-shape `Shape::width`, `Options::arrow_opacity` group transparency | done |
 | 3 | Per-square text badges (`Shape::text`, `src/render/svg/text.rs`) rendered above the arrows, XML-escaped | done |
 | 3 | `pgn` feature: `pgn::board_at` (FEN-at-move-N via `shakmaty`), `PgnError`, feature-matrix CI job | done |
-| 3 | `png` feature — only when a real consumer asks | deferred |
+| 3 | `png` feature: `png::render_png` (SVG → PNG bytes via `resvg`, `src/png.rs`), `PngError`, system-fontdb text | done |
 
 ## Build & test
 
@@ -123,9 +134,9 @@ diff-review before committing.
 CI (`.github/workflows/ci.yml`) runs a `feature-matrix` job alongside the
 main `test` job: `cargo check --no-default-features --lib` (proves the bare
 parse layer still compiles `thiserror`-only with every optional feature off)
-and `cargo test --all-features --all-targets` (exercises `pgn` — and any
-future opt-in feature — together). Run the `pgn` tests locally with `cargo
-test --features pgn`.
+and `cargo test --all-features --all-targets` (exercises `pgn` and `png`
+together, and any future opt-in feature). Run the `png` tests locally with
+`cargo test --features png`.
 
 ## Release procedure
 
@@ -158,10 +169,12 @@ for `0.2.0`+.
 ## Conventions
 
 - Errors via `thiserror`; `FenError` is the only error type of the default
-  build (`pgn` adds a separate `PgnError` behind its feature gate — never
-  grow `FenError` to cover it). **No panics on any input** — no
-  `unwrap`/`expect`/indexing on reachable paths (tests and examples
-  excepted).
+  build (`pgn`/`png` each add their own `PgnError`/`PngError` behind their
+  feature gate — never grow `FenError` to cover them). **No panics on any
+  input** — no `unwrap`/`expect`/indexing on reachable paths (tests and
+  examples excepted; a proven-unreachable panic path may use `.expect("…")`
+  naming the invariant, e.g. `png::render_png`'s PNG encode of a
+  freshly-allocated pixmap).
 - Comments only where the *why* is non-obvious from the code.
 - Tests: unit tests in `#[cfg(test)] mod tests` at the end of each file;
   end-to-end tests in `tests/integration.rs`. Every change ships with tests.
