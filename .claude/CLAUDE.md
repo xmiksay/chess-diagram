@@ -21,10 +21,16 @@ Two layers behind one seam:
   shared geometry incl. `square_center`), `grid.rs` (base squares +
   highlight/check overlays), `coordinates.rs` (file/rank labels), `shapes.rs`
   (`Options::shapes` single-square annotations — circles today, drawn between
-  the overlays and the pieces), and `arrows.rs` (straight arrows for
-  `Shape::dest`, drawn above the pieces: a `<marker>`-per-brush-color `<defs>`
-  block right after the `<svg>` header, then a `<line>` per arrow with
-  `marker-end`). `src/options.rs` holds `Options`/`Theme`/`Format` shared by
+  the overlays and the pieces), and `arrows.rs` (arrows for `Shape::dest`,
+  drawn above the pieces: a `<marker>`-per-brush-color `<defs>` block right
+  after the `<svg>` header, then a `<line>` per straight arrow or a
+  `<polyline>` per elbowed one, both with `marker-end`. `Shape::arrow`
+  resolves to straight or elbow: `Straight`/`Elbow` force the shaft shape,
+  `Auto` picks elbow for a knight-move `orig`/`dest` offset (file/rank deltas
+  of `(1, 2)`/`(2, 1)`) and straight otherwise. The elbow bends at a corner
+  sharing `dest`'s coordinate on the axis with the larger delta and `orig`'s
+  on the other — long leg first, short leg last, the lichess convention).
+  `src/options.rs` holds `Options`/`Theme`/`Format` shared by
   all impls; `src/annotation.rs` holds the `Shape`/`ArrowShape` annotation
   model (mirrors chessground's `Shape` — not part of `board.rs`, since
   annotations are a rendering concern).
@@ -54,6 +60,7 @@ Extension seams:
 | 3 | Split `src/render/svg.rs` into `src/render/svg/` submodule (annotations prereq) | done |
 | 3 | Annotation model (`src/annotation.rs`: `Shape`/`ArrowShape`) + `Options::shapes` + brush palette (`Theme::{green,red,blue,yellow}`, `Theme::resolve_brush`) + circle rendering | done |
 | 3 | Straight arrows (`Shape::dest` + `Straight`/non-knight `Auto`, `src/render/svg/arrows.rs`) rendered above the pieces | done |
+| 3 | Knight/elbow arrows (`Shape::dest` + `Elbow`/knight-move `Auto`, `src/render/svg/arrows.rs`) — bent shaft, same marker/trim conventions | done |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
 ## Build & test

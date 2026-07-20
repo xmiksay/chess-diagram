@@ -1,16 +1,17 @@
-//! Straight arrows for `Shape { dest: Some(_), .. }` — lichess-analysis
-//! style, drawn above the pieces so an arrow is never hidden by the piece
-//! sitting on `orig`/`dest`.
+//! Arrows for `Shape { dest: Some(_), .. }` — lichess-analysis style, drawn
+//! above the pieces so an arrow is never hidden by the piece sitting on
+//! `orig`/`dest`.
 //!
-//! Only [`ArrowShape::Straight`] and non-knight [`ArrowShape::Auto`] shapes
-//! render here; a knight-move `Auto` shape and `ArrowShape::Elbow` want a
-//! bent shaft, a later shape kind. A shape with an unresolvable `orig`/
+//! [`ArrowShape::Straight`] and non-knight [`ArrowShape::Auto`] shapes render
+//! a single straight shaft; [`ArrowShape::Elbow`] and knight-move `Auto`
+//! shapes render a two-segment bent shaft (long leg then short leg, the
+//! lichess knight-move convention). A shape with an unresolvable `orig`/
 //! `dest` is silently skipped — `render` stays infallible.
 
 use std::fmt::Write;
 
 use crate::annotation::{ArrowShape, Shape};
-use crate::board::Square;
+use crate::board::{Color, Square};
 use crate::options::Options;
 
 use super::square_center;
@@ -46,22 +47,38 @@ pub(super) fn write_defs(out: &mut String, opts: &Options) {
     out.push_str("</defs>");
 }
 
-/// Draws each renderable arrow's shaft as a `<line>` with a `marker-end`
-/// pointing at the matching `<defs>` entry. Call after the pieces so arrows
-/// sit on top of them.
+/// Draws each renderable arrow's shaft — a `<line>` for a straight shaft, a
+/// `<polyline>` for an elbowed one — with a `marker-end` pointing at the
+/// matching `<defs>` entry. Call after the pieces so arrows sit on top of
+/// them.
 pub(super) fn draw_arrows(out: &mut String, opts: &Options) {
     let colors = arrow_colors(opts);
-    for (shape, orig, dest) in renderable_arrows(opts) {
+    for (shape, orig, dest, geometry) in renderable_arrows(opts) {
         let color = opts.theme.resolve_brush(&shape.brush);
         let index = colors
             .iter()
             .position(|c| *c == color)
             .expect("color was collected into `colors` by the same filter");
-        draw_arrow(out, orig, dest, color, index, opts);
+        match geometry {
+            Geometry::Straight => draw_straight_arrow(out, orig, dest, color, index, opts),
+            Geometry::Elbow => draw_elbow_arrow(out, orig, dest, color, index, opts),
+        }
     }
 }
 
-fn draw_arrow(
+/// Trims `len` units off the `(x, y)` -> `(tx, ty)` segment's start, per the
+/// unit direction of that segment — shared by the straight shaft's tail trim
+/// and the elbow's tail/corner trims.
+fn trim_from(x: f32, y: f32, tx: f32, ty: f32, len: f32) -> (f32, f32) {
+    let (vx, vy) = (tx - x, ty - y);
+    let seg_len = vx.hypot(vy);
+    if seg_len <= f32::EPSILON {
+        return (x, y);
+    }
+    (x + vx / seg_len * len, y + vy / seg_len * len)
+}
+
+fn draw_straight_arrow(
     out: &mut String,
     orig: Square,
     dest: Square,
@@ -76,13 +93,56 @@ fn draw_arrow(
     if len <= HEAD_TRIM + TAIL_TRIM {
         return;
     }
-    let (ux, uy) = (vx / len, vy / len);
-    let (x1, y1) = (ox + ux * TAIL_TRIM, oy + uy * TAIL_TRIM);
-    let (x2, y2) = (dx - ux * HEAD_TRIM, dy - uy * HEAD_TRIM);
+    let (x1, y1) = trim_from(ox, oy, dx, dy, TAIL_TRIM);
+    let (x2, y2) = trim_from(dx, dy, ox, oy, HEAD_TRIM);
     let _ = write!(
         out,
         r#"<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}" stroke-width="{STROKE_WIDTH}" marker-end="url(#{MARKER_PREFIX}{marker_index})"/>"#
     );
+}
+
+/// Draws a knight-move arrow as a two-segment polyline: a long leg from
+/// `orig` to the elbow corner, then a short leg from the corner to `dest`,
+/// the lichess convention. Tail-trimmed at `orig`, head-trimmed at `dest`;
+/// the corner itself is a plain joint.
+fn draw_elbow_arrow(
+    out: &mut String,
+    orig: Square,
+    dest: Square,
+    color: &str,
+    marker_index: usize,
+    opts: &Options,
+) {
+    let (ox, oy) = square_center(orig, opts.orientation);
+    let (dx, dy) = square_center(dest, opts.orientation);
+    let (cx, cy) = elbow_corner(orig, dest, opts.orientation);
+    let head_len = (dx - cx).hypot(dy - cy);
+    if head_len <= HEAD_TRIM {
+        return;
+    }
+    let (x1, y1) = trim_from(ox, oy, cx, cy, TAIL_TRIM);
+    let (x2, y2) = trim_from(dx, dy, cx, cy, HEAD_TRIM);
+    let _ = write!(
+        out,
+        r#"<polyline points="{x1},{y1} {cx},{cy} {x2},{y2}" fill="none" stroke="{color}" stroke-width="{STROKE_WIDTH}" marker-end="url(#{MARKER_PREFIX}{marker_index})"/>"#
+    );
+}
+
+/// The bend point of an elbow, in SVG units: the long leg runs from `orig`
+/// to this corner along whichever axis (file or rank) has the larger delta,
+/// then the short leg runs from the corner to `dest` along the other axis.
+/// For a knight move this is the lichess convention — e.g. g1-f3 (file
+/// delta 1, rank delta 2) corners at g3, the long leg vertical.
+fn elbow_corner(orig: Square, dest: Square, orientation: Color) -> (f32, f32) {
+    let (ox, oy) = square_center(orig, orientation);
+    let (dx, dy) = square_center(dest, orientation);
+    let df = (i16::from(orig.file()) - i16::from(dest.file())).abs();
+    let dr = (i16::from(orig.rank()) - i16::from(dest.rank())).abs();
+    if df > dr {
+        (dx, oy)
+    } else {
+        (ox, dy)
+    }
 }
 
 /// Distinct brush colors among the renderable arrows, in first-appearance
@@ -99,19 +159,34 @@ fn arrow_colors(opts: &Options) -> Vec<&str> {
     colors
 }
 
-/// Shapes that resolve to a straight-arrow render: valid `orig`/`dest`
-/// squares and an arrow style that wants a straight shaft.
-fn renderable_arrows(opts: &Options) -> impl Iterator<Item = (&Shape, Square, Square)> {
+/// A renderable arrow's shaft shape, resolved from `Shape::arrow` and the
+/// `orig`/`dest` geometry.
+#[derive(Clone, Copy)]
+enum Geometry {
+    Straight,
+    Elbow,
+}
+
+/// Shapes that resolve to an arrow render: valid `orig`/`dest` squares, with
+/// the shaft geometry `Shape::arrow` resolves to.
+fn renderable_arrows(opts: &Options) -> impl Iterator<Item = (&Shape, Square, Square, Geometry)> {
     opts.shapes.iter().filter_map(|shape| {
         let dest = shape.dest.as_deref()?;
         let orig = Square::from_algebraic(&shape.orig)?;
         let dest = Square::from_algebraic(dest)?;
-        let straight = match shape.arrow {
-            ArrowShape::Straight => true,
-            ArrowShape::Auto => !is_knight_move(orig, dest),
-            ArrowShape::Elbow => false,
+        let elbow = match shape.arrow {
+            ArrowShape::Straight => false,
+            ArrowShape::Auto => is_knight_move(orig, dest),
+            // A same-file/same-rank move has no second axis to bend
+            // around, so an elbow degenerates to a straight shaft anyway.
+            ArrowShape::Elbow => orig.file() != dest.file() && orig.rank() != dest.rank(),
         };
-        straight.then_some((shape, orig, dest))
+        let geometry = if elbow {
+            Geometry::Elbow
+        } else {
+            Geometry::Straight
+        };
+        Some((shape, orig, dest, geometry))
     })
 }
 
@@ -160,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn auto_arrow_on_a_knight_move_is_not_yet_rendered() {
+    fn auto_arrow_on_a_knight_move_renders_an_elbow() {
         let board = parse(EMPTY).expect("empty board parses");
         let opts = Options {
             shapes: vec![arrow("g1", "f3", "green", ArrowShape::Auto)],
@@ -168,7 +243,12 @@ mod tests {
         };
         let svg = SvgRenderer.render(&board, &opts);
         assert!(!svg.contains("<line"));
-        assert!(!svg.contains("<marker"));
+        assert!(svg.contains("<polyline"));
+        assert!(svg.contains("<marker"));
+        // g1 (292.5, 337.5) -> corner (292.5, 247.5) -> f3 (247.5, 247.5),
+        // long leg vertical then short leg horizontal, tail/head-trimmed.
+        assert!(svg.contains(r#"points="292.5,325.5 292.5,247.5 267.5,247.5""#));
+        assert!(svg.contains("marker-end=\"url(#chess-diagram-arrowhead-0)\""));
     }
 
     #[test]
@@ -183,14 +263,29 @@ mod tests {
     }
 
     #[test]
-    fn elbow_arrow_is_not_yet_rendered() {
+    fn elbow_style_forces_a_bent_shaft_on_a_non_knight_move() {
+        let board = parse(EMPTY).expect("empty board parses");
+        let opts = Options {
+            shapes: vec![arrow("a1", "d4", "green", ArrowShape::Elbow)],
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        assert!(svg.contains("<polyline"));
+        assert!(!svg.contains("<line"));
+    }
+
+    #[test]
+    fn elbow_style_on_a_straight_line_move_degenerates_to_a_straight_shaft() {
+        // a1-a8 has no second axis to bend around (same file), so forcing
+        // `Elbow` still renders a plain straight shaft.
         let board = parse(EMPTY).expect("empty board parses");
         let opts = Options {
             shapes: vec![arrow("a1", "a8", "green", ArrowShape::Elbow)],
             ..Options::default()
         };
         let svg = SvgRenderer.render(&board, &opts);
-        assert!(!svg.contains("<line"));
+        assert!(svg.contains("<line"));
+        assert!(!svg.contains("<polyline"));
     }
 
     #[test]
@@ -288,5 +383,53 @@ mod tests {
             },
         );
         assert_ne!(white, black);
+    }
+
+    #[test]
+    fn elbow_arrow_flips_with_orientation() {
+        let board = parse(EMPTY).expect("empty board parses");
+        let white = SvgRenderer.render(
+            &board,
+            &Options {
+                shapes: vec![arrow("g1", "f3", "green", ArrowShape::Auto)],
+                ..Options::default()
+            },
+        );
+        let black = SvgRenderer.render(
+            &board,
+            &Options {
+                orientation: Color::Black,
+                shapes: vec![arrow("g1", "f3", "green", ArrowShape::Auto)],
+                ..Options::default()
+            },
+        );
+        assert_ne!(white, black);
+    }
+
+    #[test]
+    fn is_knight_move_detects_all_eight_offsets_and_rejects_others() {
+        let orig = Square::from_algebraic("d4").expect("valid square");
+        let knight_offsets = [
+            (1, 2),
+            (2, 1),
+            (-1, 2),
+            (-2, 1),
+            (1, -2),
+            (2, -1),
+            (-1, -2),
+            (-2, -1),
+        ];
+        for (df, dr) in knight_offsets {
+            let dest = Square::new((3 + df) as u8, (3 + dr) as u8).expect("valid square");
+            assert!(is_knight_move(orig, dest), "({df}, {dr}) is a knight move");
+        }
+        let non_knight_offsets = [(0, 1), (1, 1), (1, 0), (2, 2), (0, 2), (3, 1)];
+        for (df, dr) in non_knight_offsets {
+            let dest = Square::new((3 + df) as u8, (3 + dr) as u8).expect("valid square");
+            assert!(
+                !is_knight_move(orig, dest),
+                "({df}, {dr}) is not a knight move"
+            );
+        }
     }
 }
