@@ -17,6 +17,7 @@ fn circle(orig: &str, brush: &str) -> Shape {
         brush: brush.into(),
         text: None,
         arrow: ArrowShape::default(),
+        width: None,
     }
 }
 
@@ -28,6 +29,15 @@ fn arrow(orig: &str, dest: &str, brush: &str) -> Shape {
         brush: brush.into(),
         text: None,
         arrow: ArrowShape::Straight,
+        width: None,
+    }
+}
+
+/// A straight-arrow annotation with an explicit shaft width in SVG units.
+fn wide_arrow(orig: &str, dest: &str, brush: &str, width: f32) -> Shape {
+    Shape {
+        width: Some(width),
+        ..arrow(orig, dest, brush)
     }
 }
 
@@ -40,6 +50,7 @@ fn auto_arrow(orig: &str, dest: &str, brush: &str) -> Shape {
         brush: brush.into(),
         text: None,
         arrow: ArrowShape::Auto,
+        width: None,
     }
 }
 
@@ -115,6 +126,19 @@ pub fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
                     auto_arrow("g1", "f3", "green"),
                     auto_arrow("b8", "c6", "blue"),
                 ],
+                ..Options::default()
+            },
+        ),
+        (
+            "styled-arrows",
+            START_FEN,
+            Options {
+                shapes: vec![
+                    wide_arrow("d2", "d4", "green", 4.0),
+                    wide_arrow("e2", "e4", "green", 7.0),
+                    wide_arrow("c2", "c4", "green", 11.0),
+                ],
+                arrow_opacity: 0.55,
                 ..Options::default()
             },
         ),

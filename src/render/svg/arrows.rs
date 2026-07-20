@@ -16,8 +16,11 @@ use crate::options::Options;
 
 use super::square_center;
 
-/// Arrow shaft stroke width, in SVG units.
-const STROKE_WIDTH: f32 = 6.0;
+/// Default arrow shaft stroke width, in SVG units, when `Shape::width` is
+/// `None` — chessground's `lineWidth` (10) mapped onto our 45-unit square
+/// (`10 / 64 × 45 ≈ 7`). The arrowhead marker scales with this via
+/// `markerUnits="strokeWidth"`, so the head stays proportional at any width.
+const DEFAULT_ARROW_WIDTH: f32 = 7.0;
 /// How far the tail is pulled in from `orig`'s center, in SVG units.
 const TAIL_TRIM: f32 = 12.0;
 /// How far the head is pulled in from `dest`'s center, in SVG units — leaves
@@ -38,9 +41,12 @@ pub(super) fn write_defs(out: &mut String, opts: &Options) {
     }
     out.push_str("<defs>");
     for (index, color) in colors.iter().enumerate() {
+        // markerUnits defaults to "strokeWidth", so these 4×4 units are 4×
+        // the shaft wide and 3× long — chessground's arrowhead proportions,
+        // auto-scaling with each arrow's own stroke-width.
         let _ = write!(
             out,
-            r#"<marker id="{}{index}" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse" viewBox="0 0 10 10"><polygon points="0 0, 10 5, 0 10" fill="{color}"/></marker>"#,
+            r#"<marker id="{}{index}" markerWidth="4" markerHeight="4" refX="2.05" refY="2" orient="auto-start-reverse" viewBox="0 0 4 4"><polygon points="0,0 3,2 0,4" fill="{color}"/></marker>"#,
             MARKER_PREFIX
         );
     }
@@ -59,10 +65,26 @@ pub(super) fn draw_arrows(out: &mut String, opts: &Options) {
             .iter()
             .position(|c| *c == color)
             .expect("color was collected into `colors` by the same filter");
-        match geometry {
-            Geometry::Straight => draw_straight_arrow(out, orig, dest, color, index, opts),
-            Geometry::Elbow => draw_elbow_arrow(out, orig, dest, color, index, opts),
-        }
+        let width = shape.width.unwrap_or(DEFAULT_ARROW_WIDTH);
+        let arrow = match geometry {
+            Geometry::Straight => draw_straight_arrow(orig, dest, color, index, width, opts),
+            Geometry::Elbow => draw_elbow_arrow(orig, dest, color, index, width, opts),
+        };
+        let Some(arrow) = arrow else { continue };
+        emit_arrow(out, &arrow, opts.arrow_opacity);
+    }
+}
+
+/// Writes an arrow element, wrapping it in a `<g opacity="…">` when
+/// `opacity < 1.0` so the shaft and its arrowhead marker composite as a single
+/// translucent layer (chessground's per-shape group opacity) — a bare element
+/// with separate stroke/fill opacity would double-darken where the head
+/// overlaps the shaft. At full opacity the element is emitted as-is.
+fn emit_arrow(out: &mut String, element: &str, opacity: f32) {
+    if opacity < 1.0 {
+        let _ = write!(out, r#"<g opacity="{opacity}">{element}</g>"#);
+    } else {
+        out.push_str(element);
     }
 }
 
@@ -79,26 +101,28 @@ fn trim_from(x: f32, y: f32, tx: f32, ty: f32, len: f32) -> (f32, f32) {
 }
 
 fn draw_straight_arrow(
-    out: &mut String,
     orig: Square,
     dest: Square,
     color: &str,
     marker_index: usize,
+    width: f32,
     opts: &Options,
-) {
+) -> Option<String> {
     let (ox, oy) = square_center(orig, opts.orientation);
     let (dx, dy) = square_center(dest, opts.orientation);
     let (vx, vy) = (dx - ox, dy - oy);
     let len = vx.hypot(vy);
     if len <= HEAD_TRIM + TAIL_TRIM {
-        return;
+        return None;
     }
     let (x1, y1) = trim_from(ox, oy, dx, dy, TAIL_TRIM);
     let (x2, y2) = trim_from(dx, dy, ox, oy, HEAD_TRIM);
+    let mut out = String::new();
     let _ = write!(
         out,
-        r#"<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}" stroke-width="{STROKE_WIDTH}" marker-end="url(#{MARKER_PREFIX}{marker_index})"/>"#
+        r#"<line x1="{x1}" y1="{y1}" x2="{x2}" y2="{y2}" stroke="{color}" stroke-width="{width}" marker-end="url(#{MARKER_PREFIX}{marker_index})"/>"#
     );
+    Some(out)
 }
 
 /// Draws a knight-move arrow as a two-segment polyline: a long leg from
@@ -106,26 +130,28 @@ fn draw_straight_arrow(
 /// the lichess convention. Tail-trimmed at `orig`, head-trimmed at `dest`;
 /// the corner itself is a plain joint.
 fn draw_elbow_arrow(
-    out: &mut String,
     orig: Square,
     dest: Square,
     color: &str,
     marker_index: usize,
+    width: f32,
     opts: &Options,
-) {
+) -> Option<String> {
     let (ox, oy) = square_center(orig, opts.orientation);
     let (dx, dy) = square_center(dest, opts.orientation);
     let (cx, cy) = elbow_corner(orig, dest, opts.orientation);
     let head_len = (dx - cx).hypot(dy - cy);
     if head_len <= HEAD_TRIM {
-        return;
+        return None;
     }
     let (x1, y1) = trim_from(ox, oy, cx, cy, TAIL_TRIM);
     let (x2, y2) = trim_from(dx, dy, cx, cy, HEAD_TRIM);
+    let mut out = String::new();
     let _ = write!(
         out,
-        r#"<polyline points="{x1},{y1} {cx},{cy} {x2},{y2}" fill="none" stroke="{color}" stroke-width="{STROKE_WIDTH}" marker-end="url(#{MARKER_PREFIX}{marker_index})"/>"#
+        r#"<polyline points="{x1},{y1} {cx},{cy} {x2},{y2}" fill="none" stroke="{color}" stroke-width="{width}" marker-end="url(#{MARKER_PREFIX}{marker_index})"/>"#
     );
+    Some(out)
 }
 
 /// The bend point of an elbow, in SVG units: the long leg runs from `orig`
@@ -216,6 +242,7 @@ mod tests {
             brush: brush.into(),
             text: None,
             arrow: style,
+            width: None,
         }
     }
 
@@ -232,6 +259,66 @@ mod tests {
         assert!(svg.contains("<line"));
         assert!(svg.contains(r##"stroke="#15781B""##));
         assert!(svg.contains("marker-end=\"url(#chess-diagram-arrowhead-0)\""));
+    }
+
+    #[test]
+    fn arrow_uses_default_shaft_width_when_unset() {
+        let board = parse(EMPTY).expect("empty board parses");
+        let opts = Options {
+            shapes: vec![arrow("a1", "a8", "green", ArrowShape::Straight)],
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        assert!(svg.contains(r#"stroke-width="7""#));
+    }
+
+    #[test]
+    fn per_shape_width_overrides_the_default() {
+        let board = parse(EMPTY).expect("empty board parses");
+        let mut shape = arrow("a1", "a8", "green", ArrowShape::Straight);
+        shape.width = Some(12.5);
+        let opts = Options {
+            shapes: vec![shape],
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        assert!(svg.contains(r#"stroke-width="12.5""#));
+        assert!(!svg.contains(r#"stroke-width="7""#));
+    }
+
+    #[test]
+    fn arrow_opacity_below_one_wraps_the_element_in_a_group() {
+        let board = parse(EMPTY).expect("empty board parses");
+        let opts = Options {
+            shapes: vec![arrow("a1", "a8", "green", ArrowShape::Straight)],
+            arrow_opacity: 0.4,
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        assert!(svg.contains(r#"<g opacity="0.4"><line"#));
+    }
+
+    #[test]
+    fn full_opacity_emits_a_bare_element() {
+        let board = parse(EMPTY).expect("empty board parses");
+        let opts = Options {
+            shapes: vec![arrow("a1", "a8", "green", ArrowShape::Straight)],
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        assert!(!svg.contains(r#"<g opacity"#));
+    }
+
+    #[test]
+    fn transparent_hex_brush_passes_through_to_stroke_and_marker() {
+        let board = parse(EMPTY).expect("empty board parses");
+        let opts = Options {
+            shapes: vec![arrow("a1", "a8", "#15781Bcc", ArrowShape::Straight)],
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        assert!(svg.contains(r##"stroke="#15781Bcc""##));
+        assert!(svg.contains(r##"fill="#15781Bcc""##));
     }
 
     #[test]
