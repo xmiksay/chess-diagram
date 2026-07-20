@@ -54,6 +54,27 @@ fn auto_arrow(orig: &str, dest: &str, brush: &str) -> Shape {
     }
 }
 
+/// A text badge annotation on `orig`, brush-colored.
+fn text_badge(orig: &str, text: &str, brush: &str) -> Shape {
+    Shape {
+        orig: orig.into(),
+        dest: None,
+        brush: brush.into(),
+        text: Some(text.into()),
+        arrow: ArrowShape::default(),
+        width: None,
+    }
+}
+
+/// A straight-arrow annotation carrying a text badge on `orig` at the same
+/// time — a shape can be an arrow and a badge together.
+fn arrow_with_text(orig: &str, dest: &str, text: &str, brush: &str) -> Shape {
+    Shape {
+        text: Some(text.into()),
+        ..arrow(orig, dest, brush)
+    }
+}
+
 /// The full golden-test set (`tests/golden/<name>.svg`).
 pub fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
     vec![
@@ -139,6 +160,18 @@ pub fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
                     wide_arrow("c2", "c4", "green", 11.0),
                 ],
                 arrow_opacity: 0.55,
+                ..Options::default()
+            },
+        ),
+        (
+            "text-badges",
+            START_FEN,
+            Options {
+                shapes: vec![
+                    text_badge("e4", "!", "green"),
+                    text_badge("e5", "?", "red"),
+                    arrow_with_text("g1", "f3", "+3.2", "blue"),
+                ],
                 ..Options::default()
             },
         ),

@@ -1,11 +1,12 @@
 //! Single-square annotation shapes (`Options::shapes`), drawn between the
 //! highlight/check overlays and the pieces so a shape never hides the piece
-//! sitting on it. Arrows (`Shape::dest` set) render above the pieces
-//! instead — see `super::arrows`.
+//! sitting on it. Arrows (`Shape::dest` set) render above the pieces instead
+//! — see `super::arrows` — and text badges (`Shape::text` set) render above
+//! those — see `super::text`.
 //!
-//! Only circles (`dest: None`, `text: None`) render here; text badges are a
-//! later shape kind. A shape with an unresolvable `orig`, or one that isn't
-//! a circle, is silently skipped — `render` stays infallible.
+//! Only circles (`dest: None`, `text: None`) render here. A shape with an
+//! unresolvable `orig`, or one that isn't a circle, is silently skipped —
+//! `render` stays infallible.
 
 use std::fmt::Write;
 
@@ -117,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn shape_with_dest_or_text_is_not_yet_rendered() {
+    fn shape_with_dest_or_text_does_not_render_a_circle() {
         let board = parse(EMPTY).expect("empty board parses");
         let mut arrow = circle("e4", "green");
         arrow.dest = Some("e5".into());

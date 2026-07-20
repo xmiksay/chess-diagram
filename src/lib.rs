@@ -16,8 +16,8 @@
 //!
 //! [`Options`] controls board orientation, coordinate labels, size, theme
 //! colors, which squares get a highlight/check overlay, and which
-//! [`Shape`] annotations (circles and straight arrows today; elbowed arrows
-//! and text follow) are drawn:
+//! [`Shape`] annotations (circles, straight/elbowed arrows, and text
+//! badges) are drawn:
 //!
 //! ```
 //! use chess_diagram::{Color, Options, Square};

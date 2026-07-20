@@ -34,7 +34,12 @@ Two layers behind one seam:
   `Auto` picks elbow for a knight-move `orig`/`dest` offset (file/rank deltas
   of `(1, 2)`/`(2, 1)`) and straight otherwise. The elbow bends at a corner
   sharing `dest`'s coordinate on the axis with the larger delta and `orig`'s
-  on the other — long leg first, short leg last, the lichess convention).
+  on the other — long leg first, short leg last, the lichess convention), and
+  `text.rs` (`Shape::text` per-square badges, drawn last — above the arrows —
+  as a `<text>` in the top-right corner of `orig`, following
+  `write_coordinates`'s font-family/font-size/inset pattern; independent of
+  `Shape::dest`, so one shape can carry both an arrow and a badge; badge
+  content is XML-escaped so arbitrary text can't corrupt the markup).
   `src/options.rs` holds `Options`/`Theme`/`Format` shared by
   all impls; `src/annotation.rs` holds the `Shape`/`ArrowShape` annotation
   model (mirrors chessground's `Shape` — not part of `board.rs`, since
@@ -67,6 +72,7 @@ Extension seams:
 | 3 | Straight arrows (`Shape::dest` + `Straight`/non-knight `Auto`, `src/render/svg/arrows.rs`) rendered above the pieces | done |
 | 3 | Knight/elbow arrows (`Shape::dest` + `Elbow`/knight-move `Auto`, `src/render/svg/arrows.rs`) — bent shaft, same marker/trim conventions | done |
 | 3 | Arrow sizing: chessground-proportioned arrowhead (was 10× oversized), per-shape `Shape::width`, `Options::arrow_opacity` group transparency | done |
+| 3 | Per-square text badges (`Shape::text`, `src/render/svg/text.rs`) rendered above the arrows, XML-escaped | done |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
 ## Build & test
