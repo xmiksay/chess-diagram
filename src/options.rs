@@ -124,8 +124,8 @@ pub struct Options {
     pub size: u32,
     /// Square and overlay colors.
     pub theme: Theme,
-    /// Annotation shapes (circles, arrows, text badges) drawn under the
-    /// pieces.
+    /// Annotation shapes: circles draw under the pieces, straight arrows
+    /// draw above them (text badges are a later shape kind).
     pub shapes: Vec<Shape>,
 }
 

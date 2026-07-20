@@ -72,6 +72,12 @@ the file.
 `Options { shapes: vec![circle(e4, green), circle(e5, red), circle(c5, "#8338ec")], ..Default::default() }`
 
 </td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/circles.svg" width="240" alt="Circle annotations on e4, e5, and c5"></td></tr>
+<tr><td>
+
+`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`<br>
+`Options { shapes: vec![arrow(e2, e4, green), arrow(g1, f3, blue), arrow(d1, h5, red)], ..Default::default() }`
+
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/arrows.svg" width="240" alt="Straight arrow annotations from e2-e4, g1-f3, and d1-h5"></td></tr>
 </table>
 
 ## Design
