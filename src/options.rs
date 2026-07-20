@@ -7,6 +7,7 @@ use crate::board::{Color, Square};
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Format {
+    /// Static, self-contained SVG.
     Svg,
 }
 
@@ -14,9 +15,27 @@ pub enum Format {
 /// and `check` are the overlay tints drawn per `Options::highlight` and
 /// `Options::check` — `Theme` is the one place square colors live, so
 /// renderers never hard-code a color.
+///
+/// # Example
+///
+/// ```
+/// use chess_diagram::{Options, Theme};
+///
+/// let opts = Options {
+///     theme: Theme {
+///         light: "#eeeeee".into(),
+///         dark: "#555555".into(),
+///         ..Theme::default()
+///     },
+///     ..Default::default()
+/// };
+/// assert_eq!(opts.theme.light, "#eeeeee");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Theme {
+    /// Light square fill color.
     pub light: String,
+    /// Dark square fill color.
     pub dark: String,
     /// Overlay tint for `Options::highlight` squares (e.g. last-move from/to).
     pub highlight: String,
@@ -36,6 +55,29 @@ impl Default for Theme {
 }
 
 /// How to draw the diagram; `Options::default()` is a sensible board.
+///
+/// # Example
+///
+/// Flip the board to Black's point of view and highlight a last move:
+///
+/// ```
+/// use chess_diagram::{Color, Options, Square};
+///
+/// let opts = Options {
+///     orientation: Color::Black,
+///     highlight: vec![
+///         Square::from_algebraic("e2").unwrap(),
+///         Square::from_algebraic("e4").unwrap(),
+///     ],
+///     ..Default::default()
+/// };
+/// let svg = chess_diagram::render_svg(
+///     "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+///     &opts,
+/// )?;
+/// assert!(svg.starts_with("<svg"));
+/// # Ok::<(), chess_diagram::FenError>(())
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Options {
     /// Board point of view (default: White at the bottom).
@@ -48,6 +90,7 @@ pub struct Options {
     pub coordinates: bool,
     /// Rendered edge length in SVG px.
     pub size: u32,
+    /// Square and overlay colors.
     pub theme: Theme,
 }
 

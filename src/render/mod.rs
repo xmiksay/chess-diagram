@@ -7,8 +7,21 @@ use crate::options::{Format, Options};
 
 /// One output format = one impl. Modeled on mdcast's `Backend` trait,
 /// minus async and asset plumbing — this crate is a pure function.
+///
+/// # Example
+///
+/// ```
+/// use chess_diagram::{parse, Options, Renderer, SvgRenderer};
+///
+/// let board = parse("8/8/8/8/8/8/8/4K3")?;
+/// let svg = SvgRenderer.render(&board, &Options::default());
+/// assert!(svg.starts_with("<svg"));
+/// # Ok::<(), chess_diagram::FenError>(())
+/// ```
 pub trait Renderer {
+    /// The output format this impl produces.
     fn format(&self) -> Format;
+    /// Renders `board` under `opts` to this impl's output format.
     fn render(&self, board: &Board, opts: &Options) -> String;
 }
 

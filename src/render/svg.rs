@@ -42,6 +42,7 @@ fn grid_position(file: u8, rank: u8, orientation: Color) -> (u8, u8) {
     }
 }
 
+/// [`Renderer`] impl that emits hand-rolled, self-contained SVG.
 pub struct SvgRenderer;
 
 impl Renderer for SvgRenderer {
