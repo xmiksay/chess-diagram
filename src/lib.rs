@@ -52,12 +52,16 @@
 //!
 //! - `svg` (default) — [`SvgRenderer`] and [`render_svg`]. Pure Rust, no
 //!   dependencies beyond `thiserror`.
+//! - `pgn` (opt-in) — `pgn::board_at` walks a PGN mainline to a given ply
+//!   via `shakmaty`. Not part of the default build's dependency tree.
 #![warn(missing_docs)]
 
 mod annotation;
 mod board;
 mod fen;
 mod options;
+#[cfg(feature = "pgn")]
+pub mod pgn;
 #[cfg(feature = "svg")]
 mod pieces;
 mod render;
