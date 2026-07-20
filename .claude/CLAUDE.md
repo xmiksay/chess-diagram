@@ -33,7 +33,8 @@ Extension seams:
 | Phase | Content | Status |
 |---|---|---|
 | 0 | Model + FEN parse + `Renderer` seam + stub `SvgRenderer` (grid only) | done |
-| 1 | Full SVG: Cburnett pieces (`src/pieces.rs`), coordinates, highlight/check; golden-test harness | todo |
+| 1 | Full SVG: Cburnett pieces (`src/pieces.rs`) placed on the grid | done |
+| 1 | Coordinates, highlight/check squares; golden-test harness | todo |
 | 2 | README gallery, docs, publish 0.1 to crates.io | todo |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
