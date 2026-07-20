@@ -15,7 +15,8 @@
 //! # Options
 //!
 //! [`Options`] controls board orientation, coordinate labels, size, theme
-//! colors, and which squares get a highlight/check overlay:
+//! colors, which squares get a highlight/check overlay, and which
+//! [`Shape`] annotations (circles today; arrows/text follow) are drawn:
 //!
 //! ```
 //! use chess_diagram::{Color, Options, Square};
@@ -52,6 +53,7 @@
 //!   dependencies beyond `thiserror`.
 #![warn(missing_docs)]
 
+mod annotation;
 mod board;
 mod fen;
 mod options;
@@ -59,6 +61,7 @@ mod options;
 mod pieces;
 mod render;
 
+pub use annotation::{ArrowShape, Shape};
 pub use board::{Board, Color, Piece, Role, Square};
 pub use fen::{parse, FenError};
 pub use options::{Format, Options, Theme};

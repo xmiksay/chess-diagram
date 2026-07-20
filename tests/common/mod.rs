@@ -2,12 +2,23 @@
 //! and the README gallery generator (`examples/gallery.rs`) — one sample set,
 //! not two. Included by both via `#[path]`.
 
-use chess_diagram::{Color, Options, Square};
+use chess_diagram::{ArrowShape, Color, Options, Shape, Square};
 
 pub const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 pub const MIDGAME_FEN: &str = "r1bqk2r/pp2bppp/2n2n2/2pp4/4P3/2NP1N2/PPP2PPP/R1BQKB1R w KQkq - 0 7";
 pub const CHECK_FEN: &str = "6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 1";
 pub const HIGHLIGHT_FEN: &str = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2";
+
+/// A single-square circle annotation on `orig`, brush-colored.
+fn circle(orig: &str, brush: &str) -> Shape {
+    Shape {
+        orig: orig.into(),
+        dest: None,
+        brush: brush.into(),
+        text: None,
+        arrow: ArrowShape::default(),
+    }
+}
 
 /// The full golden-test set (`tests/golden/<name>.svg`).
 pub fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
@@ -46,6 +57,18 @@ pub fn golden_scenarios() -> Vec<(&'static str, &'static str, Options)> {
             START_FEN,
             Options {
                 coordinates: false,
+                ..Options::default()
+            },
+        ),
+        (
+            "circles",
+            HIGHLIGHT_FEN,
+            Options {
+                shapes: vec![
+                    circle("e4", "green"),
+                    circle("e5", "red"),
+                    circle("c5", "#8338ec"),
+                ],
                 ..Options::default()
             },
         ),

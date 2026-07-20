@@ -1,5 +1,6 @@
 //! Rendering options shared by every `Renderer` impl.
 
+use crate::annotation::Shape;
 use crate::board::{Color, Square};
 
 /// Output format a renderer produces. `Png`/`Typst` are added here later —
@@ -41,6 +42,14 @@ pub struct Theme {
     pub highlight: String,
     /// Overlay tint for the `Options::check` square.
     pub check: String,
+    /// Named brush: `Shape::brush == "green"`.
+    pub green: String,
+    /// Named brush: `Shape::brush == "red"`.
+    pub red: String,
+    /// Named brush: `Shape::brush == "blue"`.
+    pub blue: String,
+    /// Named brush: `Shape::brush == "yellow"`.
+    pub yellow: String,
 }
 
 impl Default for Theme {
@@ -50,6 +59,29 @@ impl Default for Theme {
             dark: "#b58863".into(),
             highlight: "#cdd26a".into(),
             check: "#eb3b3b".into(),
+            green: "#15781B".into(),
+            red: "#882020".into(),
+            blue: "#003088".into(),
+            yellow: "#e68f00".into(),
+        }
+    }
+}
+
+impl Theme {
+    /// Resolves a [`Shape::brush`](crate::Shape::brush) value to a concrete
+    /// color: a `#`-prefixed value is used literally, a known brush name
+    /// (`"green"`/`"red"`/`"blue"`/`"yellow"`) looks up the matching field
+    /// here, and anything else falls back to green — matching chess-base's
+    /// "unknown brush → green".
+    pub fn resolve_brush<'a>(&'a self, brush: &'a str) -> &'a str {
+        if brush.starts_with('#') {
+            return brush;
+        }
+        match brush {
+            "red" => &self.red,
+            "blue" => &self.blue,
+            "yellow" => &self.yellow,
+            _ => &self.green,
         }
     }
 }
@@ -92,6 +124,9 @@ pub struct Options {
     pub size: u32,
     /// Square and overlay colors.
     pub theme: Theme,
+    /// Annotation shapes (circles, arrows, text badges) drawn under the
+    /// pieces.
+    pub shapes: Vec<Shape>,
 }
 
 impl Default for Options {
@@ -103,6 +138,7 @@ impl Default for Options {
             coordinates: true,
             size: 360,
             theme: Theme::default(),
+            shapes: Vec::new(),
         }
     }
 }
@@ -121,5 +157,28 @@ mod tests {
         assert!(opts.size > 0);
         assert!(!opts.theme.highlight.is_empty());
         assert!(!opts.theme.check.is_empty());
+        assert!(opts.shapes.is_empty());
+    }
+
+    #[test]
+    fn resolve_brush_looks_up_named_colors() {
+        let theme = Theme::default();
+        assert_eq!(theme.resolve_brush("green"), theme.green);
+        assert_eq!(theme.resolve_brush("red"), theme.red);
+        assert_eq!(theme.resolve_brush("blue"), theme.blue);
+        assert_eq!(theme.resolve_brush("yellow"), theme.yellow);
+    }
+
+    #[test]
+    fn resolve_brush_uses_hex_literally() {
+        let theme = Theme::default();
+        assert_eq!(theme.resolve_brush("#123456"), "#123456");
+    }
+
+    #[test]
+    fn resolve_brush_unknown_name_falls_back_to_green() {
+        let theme = Theme::default();
+        assert_eq!(theme.resolve_brush("purple"), theme.green);
+        assert_eq!(theme.resolve_brush(""), theme.green);
     }
 }

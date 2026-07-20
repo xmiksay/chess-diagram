@@ -18,9 +18,13 @@ Two layers behind one seam:
   render() }` (modeled on mdcast's `Backend` trait); every output format is
   one impl. v1 ships `SvgRenderer` (`src/render/svg/`, hand-emitted SVG
   strings, `#[cfg(feature = "svg")]`), split into `mod.rs` (orchestration +
-  shared geometry), `grid.rs` (base squares + highlight/check overlays), and
-  `coordinates.rs` (file/rank labels). `src/options.rs` holds
-  `Options`/`Theme`/`Format` shared by all impls.
+  shared geometry incl. `square_center`), `grid.rs` (base squares +
+  highlight/check overlays), `coordinates.rs` (file/rank labels), and
+  `shapes.rs` (`Options::shapes` annotations — circles today, drawn between
+  the overlays and the pieces). `src/options.rs` holds
+  `Options`/`Theme`/`Format` shared by all impls; `src/annotation.rs` holds
+  the `Shape`/`ArrowShape` annotation model (mirrors chessground's `Shape` —
+  not part of `board.rs`, since annotations are a rendering concern).
 
 Extension seams:
 - **New output format** = new `Format` variant (the enum is
@@ -45,6 +49,7 @@ Extension seams:
 | 2 | Release workflow: tag-triggered, crates.io Trusted Publishing (OIDC) | done |
 | 2 | Publish 0.1 to crates.io | done |
 | 3 | Split `src/render/svg.rs` into `src/render/svg/` submodule (annotations prereq) | done |
+| 3 | Annotation model (`src/annotation.rs`: `Shape`/`ArrowShape`) + `Options::shapes` + brush palette (`Theme::{green,red,blue,yellow}`, `Theme::resolve_brush`) + circle rendering | done |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
 ## Build & test
