@@ -11,6 +11,12 @@
 //! in the leftmost column, file letters in the bottom row) rather than in a
 //! separate margin — that keeps the viewBox at exactly `8 * SQUARE` with no
 //! extra layout math for consumers that embed the SVG at a fixed size.
+//!
+//! `Options::highlight`/`Options::check` are drawn as semi-transparent
+//! overlay rects between the base squares and the pieces, so a tinted square
+//! still shows its piece on top. Colors come from `Theme`; only the overlay
+//! opacity is a renderer constant, since it's a rendering detail, not a color
+//! choice.
 
 use std::fmt::Write;
 
@@ -21,6 +27,10 @@ use crate::render::Renderer;
 
 /// SVG units per square; matches the Cburnett glyphs' native viewBox.
 const SQUARE: u32 = 45;
+
+/// Opacity of the highlight/check overlay rects, so the tinted square color
+/// still shows through from `Theme` underneath.
+const OVERLAY_OPACITY: f32 = 0.5;
 
 /// Maps a (file, rank) pair — both zero-based, rank 0 = rank 1 — to the grid
 /// column/row it's drawn at under the given orientation. Column/row `0` is
@@ -62,6 +72,12 @@ impl Renderer for SvgRenderer {
                 );
             }
         }
+        for square in &opts.highlight {
+            draw_overlay(&mut out, *square, opts, &opts.theme.highlight);
+        }
+        if let Some(square) = opts.check {
+            draw_overlay(&mut out, square, opts, &opts.theme.check);
+        }
         for rank in 0..8u8 {
             for file in 0..8u8 {
                 let Some(square) = Square::new(file, rank) else {
@@ -82,6 +98,17 @@ impl Renderer for SvgRenderer {
         out.push_str("</svg>");
         out
     }
+}
+
+/// Draws a semi-transparent tinted rect over `square`, orientation-aware via
+/// the same `grid_position` helper the grid and pieces use.
+fn draw_overlay(out: &mut String, square: Square, opts: &Options, fill: &str) {
+    let (col, row) = grid_position(square.file(), square.rank(), opts.orientation);
+    let (x, y) = (u32::from(col) * SQUARE, u32::from(row) * SQUARE);
+    let _ = write!(
+        out,
+        r#"<rect x="{x}" y="{y}" width="{SQUARE}" height="{SQUARE}" fill="{fill}" fill-opacity="{OVERLAY_OPACITY}"/>"#
+    );
 }
 
 /// Draws file letters (`a`-`h`) and rank digits (`1`-`8`) into the corners of
@@ -314,5 +341,86 @@ mod tests {
             opts.theme.light
         );
         assert!(black.contains(&file_label_black));
+    }
+
+    fn overlay_rect(x: u32, y: u32, fill: &str) -> String {
+        format!(
+            r#"<rect x="{x}" y="{y}" width="{SQUARE}" height="{SQUARE}" fill="{fill}" fill-opacity="{OVERLAY_OPACITY}"/>"#
+        )
+    }
+
+    #[test]
+    fn highlight_draws_two_overlay_rects_white_pov() {
+        let board = parse(START).expect("start position parses");
+        let opts = Options {
+            highlight: vec![
+                Square::from_algebraic("e2").expect("valid square"),
+                Square::from_algebraic("e4").expect("valid square"),
+            ],
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        // White POV: e2 -> grid (4, 6) -> (180, 270); e4 -> grid (4, 4) -> (180, 180).
+        assert!(svg.contains(&overlay_rect(180, 270, &opts.theme.highlight)));
+        assert!(svg.contains(&overlay_rect(180, 180, &opts.theme.highlight)));
+        assert_eq!(
+            svg.matches(&format!(r#"fill="{}""#, opts.theme.highlight))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn highlight_draws_two_overlay_rects_black_pov() {
+        let board = parse(START).expect("start position parses");
+        let opts = Options {
+            orientation: Color::Black,
+            highlight: vec![
+                Square::from_algebraic("e2").expect("valid square"),
+                Square::from_algebraic("e4").expect("valid square"),
+            ],
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        // Black POV: e2 -> grid (3, 1) -> (135, 45); e4 -> grid (3, 3) -> (135, 135).
+        assert!(svg.contains(&overlay_rect(135, 45, &opts.theme.highlight)));
+        assert!(svg.contains(&overlay_rect(135, 135, &opts.theme.highlight)));
+    }
+
+    #[test]
+    fn check_draws_tint_at_the_right_square() {
+        let board = parse(START).expect("start position parses");
+        let opts = Options {
+            check: Square::from_algebraic("e8"),
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        // White POV: e8 -> grid (4, 0) -> (180, 0).
+        assert!(svg.contains(&overlay_rect(180, 0, &opts.theme.check)));
+    }
+
+    #[test]
+    fn check_none_emits_no_check_tint() {
+        let board = parse(START).expect("start position parses");
+        let opts = Options::default();
+        let svg = SvgRenderer.render(&board, &opts);
+        assert!(!svg.contains(&opts.theme.check));
+    }
+
+    #[test]
+    fn highlight_overlay_is_drawn_under_pieces() {
+        let board = parse(START).expect("start position parses");
+        let opts = Options {
+            highlight: vec![Square::from_algebraic("e2").expect("valid square")],
+            ..Options::default()
+        };
+        let svg = SvgRenderer.render(&board, &opts);
+        let overlay_pos = svg
+            .find(&overlay_rect(180, 270, &opts.theme.highlight))
+            .expect("overlay rect present");
+        let piece_pos = svg
+            .find(r#"<g transform="translate("#)
+            .expect("at least one piece present");
+        assert!(overlay_pos < piece_pos);
     }
 }

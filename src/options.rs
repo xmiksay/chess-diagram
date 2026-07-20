@@ -10,11 +10,18 @@ pub enum Format {
     Svg,
 }
 
-/// Square colors. Defaults match the familiar lichess brown board.
+/// Square colors. Defaults match the familiar lichess brown board; `highlight`
+/// and `check` are the overlay tints drawn per `Options::highlight` and
+/// `Options::check` — `Theme` is the one place square colors live, so
+/// renderers never hard-code a color.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Theme {
     pub light: String,
     pub dark: String,
+    /// Overlay tint for `Options::highlight` squares (e.g. last-move from/to).
+    pub highlight: String,
+    /// Overlay tint for the `Options::check` square.
+    pub check: String,
 }
 
 impl Default for Theme {
@@ -22,6 +29,8 @@ impl Default for Theme {
         Theme {
             light: "#f0d9b5".into(),
             dark: "#b58863".into(),
+            highlight: "#cdd26a".into(),
+            check: "#eb3b3b".into(),
         }
     }
 }
@@ -67,5 +76,7 @@ mod tests {
         assert_eq!(opts.check, None);
         assert!(opts.coordinates);
         assert!(opts.size > 0);
+        assert!(!opts.theme.highlight.is_empty());
+        assert!(!opts.theme.check.is_empty());
     }
 }
