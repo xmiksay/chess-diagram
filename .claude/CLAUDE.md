@@ -39,6 +39,7 @@ Extension seams:
 | 1 | Golden-test harness | done |
 | 2 | README gallery (`assets/gallery/`) + freshness test | done |
 | 2 | Rustdoc pass: crate docs, doc examples, `#![warn(missing_docs)]` | done |
+| 2 | Package metadata + contents + license hygiene (`Cargo.toml` `exclude`, README image URLs) | done |
 | 2 | Publish 0.1 to crates.io | todo |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 

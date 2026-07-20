@@ -47,31 +47,31 @@ the file.
 `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`<br>
 `Options::default()`
 
-</td><td><img src="assets/gallery/start.svg" width="240" alt="Start position"></td></tr>
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/start.svg" width="240" alt="Start position"></td></tr>
 <tr><td>
 
 `r1bqk2r/pp2bppp/2n2n2/2pp4/4P3/2NP1N2/PPP2PPP/R1BQKB1R w KQkq - 0 7`<br>
 `Options::default()`
 
-</td><td><img src="assets/gallery/midgame.svg" width="240" alt="Midgame position"></td></tr>
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/midgame.svg" width="240" alt="Midgame position"></td></tr>
 <tr><td>
 
 `rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`<br>
 `Options { orientation: Color::Black, ..Default::default() }`
 
-</td><td><img src="assets/gallery/flipped.svg" width="240" alt="Start position, flipped to Black's viewpoint"></td></tr>
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/flipped.svg" width="240" alt="Start position, flipped to Black's viewpoint"></td></tr>
 <tr><td>
 
 `rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2`<br>
 `Options { highlight: vec![e2, e4], ..Default::default() }`
 
-</td><td><img src="assets/gallery/highlight.svg" width="240" alt="Last-move highlight on e2 and e4"></td></tr>
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/highlight.svg" width="240" alt="Last-move highlight on e2 and e4"></td></tr>
 <tr><td>
 
 `6k1/5ppp/8/8/8/8/5PPP/3R2K1 b - - 0 1`<br>
 `Options { check: Square::from_algebraic("g8"), ..Default::default() }`
 
-</td><td><img src="assets/gallery/check.svg" width="240" alt="King in check on g8"></td></tr>
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/check.svg" width="240" alt="King in check on g8"></td></tr>
 </table>
 
 ## Design
