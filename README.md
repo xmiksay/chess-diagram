@@ -78,6 +78,12 @@ the file.
 `Options { shapes: vec![arrow(e2, e4, green), arrow(g1, f3, blue), arrow(d1, h5, red)], ..Default::default() }`
 
 </td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/arrows.svg" width="240" alt="Straight arrow annotations from e2-e4, g1-f3, and d1-h5"></td></tr>
+<tr><td>
+
+`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`<br>
+`Options { shapes: vec![arrow(g1, f3, green), arrow(b8, c6, blue)], ..Default::default() }`
+
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/knight-arrow.svg" width="240" alt="Elbow arrow annotations for the knight moves g1-f3 and b8-c6"></td></tr>
 </table>
 
 ## Design
