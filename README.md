@@ -144,15 +144,17 @@ loading — those belong to the consumers.
 - **Parse layer** (`parse`, `Board`, `Square`) — zero-dep, hand-rolled FEN
   placement parse. It never mentions any output format.
 - **Renderer seam** — every output format is one impl of the `Renderer` trait
-  (`format()` + `render()`). v1 ships `SvgRenderer`; PNG/typst slot in later
-  as additive impls, never a rewrite.
+  (`format()` + `render()`). v1 ships `SvgRenderer`; typst slots in later as
+  an additive impl, never a rewrite. `png` rasterises `SvgRenderer`'s own
+  output rather than adding a second `Renderer` impl, since it produces bytes
+  instead of a `String`.
 - **Features** — the default feature set never gains a heavy dependency:
 
   | Feature | Default | Adds | Gives you |
   |---|---|---|---|
   | `svg` | yes | nothing (pure Rust) | `SvgRenderer`, `render_svg` |
   | `pgn` | no | `shakmaty` | `pgn::board_at(pgn, ply)` — walk a PGN mainline to a ply, get a `Board` to render |
-  | `png` | no (planned) | `resvg` | rasterise SVG → `Vec<u8>` |
+  | `png` | no | `resvg` (implies `svg`) | `png::render_png(fen, opts)` — rasterise to `Options::size`-square PNG bytes |
 
   With `features = ["pgn"]`:
 
@@ -161,6 +163,18 @@ loading — those belong to the consumers.
 
   let board = board_at("1. e4 e5 2. Nf3 Nc6 3. Bb5", 5)?;
   assert!(board.piece_at(chess_diagram::Square::from_algebraic("b5").unwrap()).is_some());
+  ```
+
+  With `features = ["png"]` — coordinate labels and text badges use
+  `sans-serif`, so this loads the host's system fonts via `fontdb`; exact
+  pixel output is environment-dependent, but dimensions and PNG validity
+  aren't:
+
+  ```rust
+  use chess_diagram::{png::render_png, Options};
+
+  let bytes = render_png("8/8/8/8/8/8/8/4K3", &Options::default())?;
+  assert!(bytes.starts_with(&[0x89, b'P', b'N', b'G']));
   ```
 
 ## Development

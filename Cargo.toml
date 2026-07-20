@@ -14,9 +14,12 @@ exclude = ["assets/gallery/", "tests/golden/", ".github/"]
 default = ["svg"]
 svg = []
 pgn = ["dep:shakmaty"]
-# Future, added only when a real consumer asks (PROJECT_PLAN.md §10):
-# png = ["svg", "dep:resvg"] # rasterise SVG → PNG bytes
+png = ["svg", "dep:resvg"]
 
 [dependencies]
 thiserror = "2"
 shakmaty = { version = "0.30", optional = true }
+resvg = { version = "0.47", optional = true }
+
+[dev-dependencies]
+png = "0.18"
