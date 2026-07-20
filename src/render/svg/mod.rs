@@ -2,8 +2,9 @@
 //!
 //! Emits the board grid ([`grid`], orientation- and theme-aware), single-
 //! square annotations ([`shapes`]) and the Cburnett pieces (`crate::pieces`),
-//! then straight arrows ([`arrows`]) on top of the pieces and finally
-//! coordinate labels ([`coordinates`]) when enabled. The viewBox is
+//! then arrows ([`arrows`]) and text badges ([`text`]) on top of the pieces
+//! — the annotation top layer — and finally coordinate labels
+//! ([`coordinates`]) when enabled. The viewBox is
 //! `0 0 360 360` — 45 SVG units per square, matching the Cburnett glyphs'
 //! native 45×45 coordinate system exactly — so squares and glyphs both use
 //! integral coordinates and pieces need only a `translate`, no `scale`.
@@ -19,6 +20,7 @@ mod arrows;
 mod coordinates;
 mod grid;
 mod shapes;
+mod text;
 
 /// SVG units per square; matches the Cburnett glyphs' native viewBox.
 pub(super) const SQUARE: u32 = 45;
@@ -84,6 +86,7 @@ impl Renderer for SvgRenderer {
             }
         }
         arrows::draw_arrows(&mut out, opts);
+        text::draw_text_badges(&mut out, opts);
         if opts.coordinates {
             coordinates::write_coordinates(&mut out, opts);
         }
