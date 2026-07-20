@@ -162,10 +162,9 @@ with workflow filename `release.yml` before the first tag push.
 **Note:** `0.1.0` was published manually (`cargo publish`) — the trusted
 publisher for `xmiksay/chess-diagram` was not registered before the `v0.1.0`
 tag push, so `release.yml`'s OIDC token exchange failed with "No Trusted
-Publishing config found for repository". The crate now exists on crates.io,
-so the trusted publisher can be added from its Settings page (step 2 in the
-workflow header) before the next tag push, restoring the tag-triggered flow
-for `0.2.0`+.
+Publishing config found for repository". The trusted publisher was added
+afterwards, and `0.2.0` published cleanly through the tag-triggered OIDC flow
+— so `v0.2.0`+ tags publish automatically with no further setup.
 
 ## Conventions
 
