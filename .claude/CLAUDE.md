@@ -40,6 +40,7 @@ Extension seams:
 | 2 | README gallery (`assets/gallery/`) + freshness test | done |
 | 2 | Rustdoc pass: crate docs, doc examples, `#![warn(missing_docs)]` | done |
 | 2 | Package metadata + contents + license hygiene (`Cargo.toml` `exclude`, README image URLs) | done |
+| 2 | Release workflow: tag-triggered, crates.io Trusted Publishing (OIDC) | done |
 | 2 | Publish 0.1 to crates.io | todo |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
@@ -76,6 +77,26 @@ by `tests/integration.rs` and `examples/gallery.rs` via `#[path]`) rendered to
 `doc_gallery_up_to_date` test byte-compares each render against the committed
 file and fails naming the stale one; regenerate with `make gallery`, then
 diff-review before committing.
+
+## Release procedure
+
+Publishing to crates.io is tag-triggered (`.github/workflows/release.yml`),
+authenticating via crates.io **Trusted Publishing (OIDC)** — no
+`CARGO_REGISTRY_TOKEN` secret exists or is needed in this repo.
+
+To cut a release:
+
+1. Bump the `version` in `Cargo.toml`.
+2. `make verify` locally, commit, merge to `master`.
+3. Tag and push: `git tag v<version> && git push origin v<version>` — the
+   tag must match `Cargo.toml`'s version exactly (the workflow fails the
+   release otherwise).
+4. The `release.yml` workflow re-runs the full verify gate (fmt, clippy,
+   tests) then publishes via `cargo publish` under OIDC.
+
+One-time setup (already documented in the workflow header comment): the
+crates.io trusted publisher for `xmiksay/chess-diagram` must be configured
+with workflow filename `release.yml` before the first tag push.
 
 ## Conventions
 
