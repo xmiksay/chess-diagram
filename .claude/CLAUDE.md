@@ -44,14 +44,24 @@ Two layers behind one seam:
   all impls; `src/annotation.rs` holds the `Shape`/`ArrowShape` annotation
   model (mirrors chessground's `Shape` — not part of `board.rs`, since
   annotations are a rendering concern).
+- **PGN layer** — `src/pgn.rs` (`#[cfg(feature = "pgn")]`, opt-in): `pub fn
+  board_at(pgn: &str, ply: usize) -> Result<Board, PgnError>` walks a PGN
+  mainline via `shakmaty` (SAN disambiguation, castling, en passant,
+  promotion all delegated to it) and converts `shakmaty`'s `Board`/`Color`/
+  `Role`/`Piece` into this crate's model. `mainline_sans` tokenizes the
+  movetext (drops header-tag lines whole since a quoted value may contain
+  whitespace; tracks brace/paren depth across words so multi-word comments
+  and variations are skipped in full; stops at a result token). Errors are
+  `PgnError`, a type separate from `FenError` — this module never touches
+  the parse layer or its error contract.
 
 Extension seams:
 - **New output format** = new `Format` variant (the enum is
   `#[non_exhaustive]`) + one new `Renderer` impl under `src/render/`. Never a
   parse-layer change.
-- **Heavier capability** = opt-in Cargo feature: `pgn` (gates `shakmaty`),
-  `png` (gates `resvg`). **The default feature set never gains a heavy
-  dependency.**
+- **Heavier capability** = opt-in Cargo feature: `pgn` (gates `shakmaty`,
+  landed), `png` (gates `resvg`, still deferred). **The default feature set
+  never gains a heavy dependency.**
 
 ## Status
 
@@ -73,7 +83,8 @@ Extension seams:
 | 3 | Knight/elbow arrows (`Shape::dest` + `Elbow`/knight-move `Auto`, `src/render/svg/arrows.rs`) — bent shaft, same marker/trim conventions | done |
 | 3 | Arrow sizing: chessground-proportioned arrowhead (was 10× oversized), per-shape `Shape::width`, `Options::arrow_opacity` group transparency | done |
 | 3 | Per-square text badges (`Shape::text`, `src/render/svg/text.rs`) rendered above the arrows, XML-escaped | done |
-| 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
+| 3 | `pgn` feature: `pgn::board_at` (FEN-at-move-N via `shakmaty`), `PgnError`, feature-matrix CI job | done |
+| 3 | `png` feature — only when a real consumer asks | deferred |
 
 ## Build & test
 
@@ -109,6 +120,13 @@ by `tests/integration.rs` and `examples/gallery.rs` via `#[path]`) rendered to
 file and fails naming the stale one; regenerate with `make gallery`, then
 diff-review before committing.
 
+CI (`.github/workflows/ci.yml`) runs a `feature-matrix` job alongside the
+main `test` job: `cargo check --no-default-features --lib` (proves the bare
+parse layer still compiles `thiserror`-only with every optional feature off)
+and `cargo test --all-features --all-targets` (exercises `pgn` — and any
+future opt-in feature — together). Run the `pgn` tests locally with `cargo
+test --features pgn`.
+
 ## Release procedure
 
 Publishing to crates.io is tag-triggered (`.github/workflows/release.yml`),
@@ -139,9 +157,11 @@ for `0.2.0`+.
 
 ## Conventions
 
-- Errors via `thiserror`; `FenError` is the only error type. **No panics on
-  any input** — no `unwrap`/`expect`/indexing on reachable paths (tests and
-  examples excepted).
+- Errors via `thiserror`; `FenError` is the only error type of the default
+  build (`pgn` adds a separate `PgnError` behind its feature gate — never
+  grow `FenError` to cover it). **No panics on any input** — no
+  `unwrap`/`expect`/indexing on reachable paths (tests and examples
+  excepted).
 - Comments only where the *why* is non-obvious from the code.
 - Tests: unit tests in `#[cfg(test)] mod tests` at the end of each file;
   end-to-end tests in `tests/integration.rs`. Every change ships with tests.
