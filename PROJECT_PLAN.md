@@ -138,7 +138,10 @@ chess-diagram/
 │  ├─ options.rs             # Options, Theme, Format
 │  ├─ render/
 │  │  ├─ mod.rs               # Renderer trait + dispatch
-│  │  └─ svg.rs               # #[cfg(feature = "svg")] SvgRenderer
+│  │  └─ svg/                 # #[cfg(feature = "svg")] SvgRenderer
+│  │     ├─ mod.rs            # SvgRenderer + render() orchestration, shared geometry
+│  │     ├─ grid.rs           # base squares + highlight/check overlay rects
+│  │     └─ coordinates.rs    # file/rank coordinate labels
 │  ├─ pieces.rs               # Cburnett BSD piece SVG path consts (feature = "svg")
 │  └─ pgn.rs                  # #[cfg(feature = "pgn")] FEN-at-move-N (gates shakmaty)
 ├─ examples/gallery.rs        # render sample FENs to files (doc gallery)
