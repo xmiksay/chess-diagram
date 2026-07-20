@@ -66,6 +66,36 @@ the file.
 `Options { check: Square::from_algebraic("g8"), ..Default::default() }`
 
 </td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/check.svg" width="240" alt="King in check on g8"></td></tr>
+</table>
+
+## Annotations
+
+`Options::shapes` draws study-style overlays — circles, arrows (straight or
+knight-move elbows), and text badges — on top of the board. `Shape` mirrors
+chessground's shape model field-for-field, so a `Shape` payload from a
+chessground-based frontend forwards straight through with no translation:
+
+```rust
+use chess_diagram::{render_svg, ArrowShape, Options, Shape};
+
+let opts = Options {
+    shapes: vec![
+        // Circle: brush on `orig`, no `dest`.
+        Shape { orig: "e5".into(), dest: None, brush: "red".into(), text: None,
+                arrow: ArrowShape::default(), width: None },
+        // Arrow: `dest` set — `Auto` picks straight, or an elbow on a knight move.
+        Shape { orig: "g1".into(), dest: Some("f3".into()), brush: "green".into(),
+                text: None, arrow: ArrowShape::Auto, width: None },
+        // Text badge: independent of `dest`, so it can ride along an arrow too.
+        Shape { orig: "e4".into(), dest: None, brush: "green".into(),
+                text: Some("!".into()), arrow: ArrowShape::default(), width: None },
+    ],
+    ..Options::default()
+};
+let svg = render_svg("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", &opts)?;
+```
+
+<table>
 <tr><td>
 
 `rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2`<br>
