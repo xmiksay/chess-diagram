@@ -6,8 +6,9 @@ Pure Rust; the default build depends on `thiserror` and nothing else.
 
 > **Status: Phase 1 (in progress)** — model, FEN parse, and the `Renderer`
 > seam are in place; the SVG renderer places the Cburnett pieces on the board
-> grid and draws file/rank coordinate labels. Highlight/check squares and the
-> golden-test harness are still to land (see [PROJECT_PLAN.md](PROJECT_PLAN.md)).
+> grid, draws file/rank coordinate labels, and tints highlight/check squares.
+> The golden-test harness is still to land (see
+> [PROJECT_PLAN.md](PROJECT_PLAN.md)).
 
 ## Usage
 

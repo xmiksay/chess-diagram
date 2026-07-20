@@ -35,7 +35,8 @@ Extension seams:
 | 0 | Model + FEN parse + `Renderer` seam + stub `SvgRenderer` (grid only) | done |
 | 1 | Full SVG: Cburnett pieces (`src/pieces.rs`) placed on the grid | done |
 | 1 | Coordinate labels (`Options::coordinates`) | done |
-| 1 | Highlight/check squares; golden-test harness | todo |
+| 1 | Highlight/check squares (`Options::highlight`/`check`) | done |
+| 1 | Golden-test harness | todo |
 | 2 | README gallery, docs, publish 0.1 to crates.io | todo |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
