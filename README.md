@@ -84,7 +84,19 @@ the file.
 `Options { shapes: vec![arrow(g1, f3, green), arrow(b8, c6, blue)], ..Default::default() }`
 
 </td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/knight-arrow.svg" width="240" alt="Elbow arrow annotations for the knight moves g1-f3 and b8-c6"></td></tr>
+<tr><td>
+
+`rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1`<br>
+`Options { shapes: vec![arrow(d2, d4, green).width(4), arrow(e2, e4, green).width(7), arrow(c2, c4, green).width(11)], arrow_opacity: 0.55, ..Default::default() }`
+
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/styled-arrows.svg" width="240" alt="Arrows of increasing shaft width (4, 7, 11) drawn semi-transparently, with arrowheads scaling to match"></td></tr>
 </table>
+
+Per-arrow shaft width is set with `Shape::width` (`None` uses the default
+~7 SVG units); the arrowhead scales with it, so a thicker shaft gets a
+proportionally larger head — the chessground look. `Options::arrow_opacity`
+(default `1.0`) makes every arrow translucent as one layer; a transparent
+`"#rrggbbaa"` brush works too.
 
 ## Design
 

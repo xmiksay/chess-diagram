@@ -23,8 +23,13 @@ Two layers behind one seam:
   (`Options::shapes` single-square annotations — circles today, drawn between
   the overlays and the pieces), and `arrows.rs` (arrows for `Shape::dest`,
   drawn above the pieces: a `<marker>`-per-brush-color `<defs>` block right
-  after the `<svg>` header, then a `<line>` per straight arrow or a
-  `<polyline>` per elbowed one, both with `marker-end`. `Shape::arrow`
+  after the `<svg>` header — a 4×4 `markerUnits="strokeWidth"` arrowhead
+  (chessground's proportions, so the head is ~4× the shaft and auto-scales
+  with each arrow's stroke width) — then a `<line>` per straight arrow or a
+  `<polyline>` per elbowed one, both with `marker-end`. Shaft width is
+  `Shape::width` (`None` → `DEFAULT_ARROW_WIDTH` ≈ 7). `Options::arrow_opacity`
+  (< 1.0) wraps each arrow in a `<g opacity>` so shaft + head composite as one
+  translucent layer without double-darkening. `Shape::arrow`
   resolves to straight or elbow: `Straight`/`Elbow` force the shaft shape,
   `Auto` picks elbow for a knight-move `orig`/`dest` offset (file/rank deltas
   of `(1, 2)`/`(2, 1)`) and straight otherwise. The elbow bends at a corner
@@ -61,6 +66,7 @@ Extension seams:
 | 3 | Annotation model (`src/annotation.rs`: `Shape`/`ArrowShape`) + `Options::shapes` + brush palette (`Theme::{green,red,blue,yellow}`, `Theme::resolve_brush`) + circle rendering | done |
 | 3 | Straight arrows (`Shape::dest` + `Straight`/non-knight `Auto`, `src/render/svg/arrows.rs`) rendered above the pieces | done |
 | 3 | Knight/elbow arrows (`Shape::dest` + `Elbow`/knight-move `Auto`, `src/render/svg/arrows.rs`) — bent shaft, same marker/trim conventions | done |
+| 3 | Arrow sizing: chessground-proportioned arrowhead (was 10× oversized), per-shape `Shape::width`, `Options::arrow_opacity` group transparency | done |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
 ## Build & test

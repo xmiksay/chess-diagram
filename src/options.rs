@@ -110,7 +110,7 @@ impl Theme {
 /// assert!(svg.starts_with("<svg"));
 /// # Ok::<(), chess_diagram::FenError>(())
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Options {
     /// Board point of view (default: White at the bottom).
     pub orientation: Color,
@@ -127,6 +127,10 @@ pub struct Options {
     /// Annotation shapes: circles draw under the pieces, straight arrows
     /// draw above them (text badges are a later shape kind).
     pub shapes: Vec<Shape>,
+    /// Opacity applied to every arrow (shaft + head together), `0.0`–`1.0`.
+    /// `1.0` (the default) is fully opaque, matching chessground's solid
+    /// brushes; lower it toward `0.4` for the "pale" translucent look.
+    pub arrow_opacity: f32,
 }
 
 impl Default for Options {
@@ -139,6 +143,7 @@ impl Default for Options {
             size: 360,
             theme: Theme::default(),
             shapes: Vec::new(),
+            arrow_opacity: 1.0,
         }
     }
 }
@@ -158,6 +163,7 @@ mod tests {
         assert!(!opts.theme.highlight.is_empty());
         assert!(!opts.theme.check.is_empty());
         assert!(opts.shapes.is_empty());
+        assert_eq!(opts.arrow_opacity, 1.0);
     }
 
     #[test]

@@ -17,10 +17,11 @@
 ///     brush: "green".into(),
 ///     text: None,
 ///     arrow: ArrowShape::default(),
+///     width: None,
 /// };
 /// assert_eq!(circle.arrow, ArrowShape::Auto);
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Shape {
     /// Origin square in algebraic notation, e.g. `"e4"`.
     pub orig: String,
@@ -28,13 +29,18 @@ pub struct Shape {
     /// badge on `orig`; `Some` draws an arrow from `orig` to `dest`.
     pub dest: Option<String>,
     /// Brush color: a named brush (`"green"`/`"red"`/`"blue"`/`"yellow"`) or
-    /// a literal `"#rrggbb"`. Resolved against `Theme` at render time; an
-    /// unknown name falls back to green.
+    /// a literal `"#rrggbb"`/`"#rrggbbaa"`. Resolved against `Theme` at render
+    /// time; an unknown name falls back to green.
     pub brush: String,
     /// Optional corner badge text drawn on `orig`.
     pub text: Option<String>,
     /// Arrow head/body style; only meaningful when `dest` is `Some`.
     pub arrow: ArrowShape,
+    /// Arrow shaft width in SVG units; `None` uses the renderer default. Only
+    /// meaningful when `dest` is `Some`. The arrowhead scales with this width,
+    /// so a thicker shaft gets a proportionally larger head (chessground's
+    /// per-brush `lineWidth`).
+    pub width: Option<f32>,
 }
 
 /// How an arrow shape is drawn. `Auto` (the default) picks straight vs.
@@ -68,11 +74,13 @@ mod tests {
             brush: "red".into(),
             text: Some("!".into()),
             arrow: ArrowShape::Straight,
+            width: Some(8.0),
         };
         assert_eq!(shape.orig, "e4");
         assert_eq!(shape.dest.as_deref(), Some("e5"));
         assert_eq!(shape.brush, "red");
         assert_eq!(shape.text.as_deref(), Some("!"));
         assert_eq!(shape.arrow, ArrowShape::Straight);
+        assert_eq!(shape.width, Some(8.0));
     }
 }

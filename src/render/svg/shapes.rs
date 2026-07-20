@@ -65,6 +65,7 @@ mod tests {
             brush: brush.into(),
             text: None,
             arrow: ArrowShape::default(),
+            width: None,
         }
     }
 
