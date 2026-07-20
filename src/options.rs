@@ -68,6 +68,48 @@ impl Default for Theme {
 }
 
 impl Theme {
+    /// The default lichess-style brown board (`Theme::default()`) — light
+    /// `#f0d9b5`, dark `#b58863`.
+    pub fn brown() -> Self {
+        Theme::default()
+    }
+
+    /// A blue board preset — light `#dee3e6`, dark `#8ca2ad`. Overlay and
+    /// brush colors are unchanged from [`Theme::default`].
+    ///
+    /// ```
+    /// use chess_diagram::Theme;
+    ///
+    /// let theme = Theme::blue();
+    /// assert_eq!(theme.light, "#dee3e6");
+    /// assert_eq!(theme.dark, "#8ca2ad");
+    /// ```
+    pub fn blue() -> Self {
+        Theme {
+            light: "#dee3e6".into(),
+            dark: "#8ca2ad".into(),
+            ..Theme::default()
+        }
+    }
+
+    /// A green board preset — light `#ffffdd`, dark `#86a666`. Overlay and
+    /// brush colors are unchanged from [`Theme::default`].
+    ///
+    /// ```
+    /// use chess_diagram::Theme;
+    ///
+    /// let theme = Theme::green();
+    /// assert_eq!(theme.light, "#ffffdd");
+    /// assert_eq!(theme.dark, "#86a666");
+    /// ```
+    pub fn green() -> Self {
+        Theme {
+            light: "#ffffdd".into(),
+            dark: "#86a666".into(),
+            ..Theme::default()
+        }
+    }
+
     /// Resolves a [`Shape::brush`](crate::Shape::brush) value to a concrete
     /// color: a `#`-prefixed value is used literally, a known brush name
     /// (`"green"`/`"red"`/`"blue"`/`"yellow"`) looks up the matching field
@@ -186,5 +228,26 @@ mod tests {
         let theme = Theme::default();
         assert_eq!(theme.resolve_brush("purple"), theme.green);
         assert_eq!(theme.resolve_brush(""), theme.green);
+    }
+
+    #[test]
+    fn brown_preset_matches_default() {
+        assert_eq!(Theme::brown(), Theme::default());
+    }
+
+    #[test]
+    fn blue_and_green_presets_only_change_square_colors() {
+        let default = Theme::default();
+        for preset in [Theme::blue(), Theme::green()] {
+            assert_ne!(preset.light, default.light);
+            assert_ne!(preset.dark, default.dark);
+            assert_eq!(preset.highlight, default.highlight);
+            assert_eq!(preset.check, default.check);
+            assert_eq!(preset.green, default.green);
+            assert_eq!(preset.red, default.red);
+            assert_eq!(preset.blue, default.blue);
+            assert_eq!(preset.yellow, default.yellow);
+        }
+        assert_ne!(Theme::blue(), Theme::green());
     }
 }
