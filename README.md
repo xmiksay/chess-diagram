@@ -66,6 +66,12 @@ the file.
 `Options { check: Square::from_algebraic("g8"), ..Default::default() }`
 
 </td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/check.svg" width="240" alt="King in check on g8"></td></tr>
+<tr><td>
+
+`rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 0 2`<br>
+`Options { shapes: vec![circle(e4, green), circle(e5, red), circle(c5, "#8338ec")], ..Default::default() }`
+
+</td><td><img src="https://raw.githubusercontent.com/xmiksay/chess-diagram/master/assets/gallery/circles.svg" width="240" alt="Circle annotations on e4, e5, and c5"></td></tr>
 </table>
 
 ## Design

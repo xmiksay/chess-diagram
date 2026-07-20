@@ -16,6 +16,7 @@ use crate::render::Renderer;
 
 mod coordinates;
 mod grid;
+mod shapes;
 
 /// SVG units per square; matches the Cburnett glyphs' native viewBox.
 pub(super) const SQUARE: u32 = 45;
@@ -28,6 +29,17 @@ pub(super) fn grid_position(file: u8, rank: u8, orientation: Color) -> (u8, u8) 
         Color::White => (file, 7 - rank),
         Color::Black => (7 - file, rank),
     }
+}
+
+/// Center point (SVG units) of `square` under the given orientation — the
+/// shared anchor circles, and later arrows and text badges, resolve against.
+pub(super) fn square_center(square: Square, orientation: Color) -> (f32, f32) {
+    let (col, row) = grid_position(square.file(), square.rank(), orientation);
+    let half = SQUARE as f32 / 2.0;
+    (
+        f32::from(col) * SQUARE as f32 + half,
+        f32::from(row) * SQUARE as f32 + half,
+    )
 }
 
 /// [`Renderer`] impl that emits hand-rolled, self-contained SVG.
@@ -53,6 +65,7 @@ impl Renderer for SvgRenderer {
         if let Some(square) = opts.check {
             grid::draw_overlay(&mut out, square, opts, &opts.theme.check);
         }
+        shapes::draw_shapes(&mut out, opts);
         for rank in 0..8u8 {
             for file in 0..8u8 {
                 let Some(square) = Square::new(file, rank) else {
