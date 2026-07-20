@@ -9,20 +9,37 @@ use crate::board::{Board, Color, Piece, Role};
 /// The one error type of the crate — FEN parsing is the only fallible step.
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum FenError {
+    /// The FEN string was empty (or all whitespace).
     #[error("empty FEN string")]
     Empty,
+    /// The placement field didn't split into exactly 8 `/`-separated ranks.
     #[error("expected 8 ranks separated by '/', found {0}")]
     RankCount(usize),
+    /// A rank (1-indexed) described more or fewer than 8 squares.
     #[error("rank {0} does not describe exactly 8 squares")]
     RankWidth(u8),
+    /// A placement character wasn't a digit `1`-`8` or a piece letter.
     #[error("invalid piece character {0:?}")]
     InvalidPiece(char),
+    /// The side-to-move field wasn't `w` or `b`.
     #[error("invalid side to move {0:?}")]
     InvalidSideToMove(String),
 }
 
 /// Parses a FEN string (full six-field form or just the placement field)
-/// into a [`Board`]. Never panics on any input.
+/// into a [`Board`]. Never panics on any input — malformed FEN is reported
+/// as a [`FenError`], not a panic.
+///
+/// # Example
+///
+/// ```
+/// use chess_diagram::{parse, Square};
+///
+/// let board = parse("8/8/8/8/8/8/8/4K3 w - - 0 1")?;
+/// assert!(board.piece_at(Square::from_algebraic("e1").unwrap()).is_some());
+/// assert!(parse("not a fen").is_err());
+/// # Ok::<(), chess_diagram::FenError>(())
+/// ```
 pub fn parse(fen: &str) -> Result<Board, FenError> {
     let mut fields = fen.split_ascii_whitespace();
     let placement = fields.next().ok_or(FenError::Empty)?;

@@ -38,7 +38,8 @@ Extension seams:
 | 1 | Highlight/check squares (`Options::highlight`/`check`) | done |
 | 1 | Golden-test harness | done |
 | 2 | README gallery (`assets/gallery/`) + freshness test | done |
-| 2 | Docs polish, publish 0.1 to crates.io | todo |
+| 2 | Rustdoc pass: crate docs, doc examples, `#![warn(missing_docs)]` | done |
+| 2 | Publish 0.1 to crates.io | todo |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
 ## Build & test

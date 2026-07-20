@@ -6,30 +6,51 @@
 /// Piece color; doubles as board orientation (point of view) in `Options`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Color {
+    /// White, the default orientation and side to move.
     #[default]
     White,
+    /// Black.
     Black,
 }
 
 /// Piece kind, independent of color.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Role {
+    /// Pawn.
     Pawn,
+    /// Knight.
     Knight,
+    /// Bishop.
     Bishop,
+    /// Rook.
     Rook,
+    /// Queen.
     Queen,
+    /// King.
     King,
 }
 
 /// A colored piece occupying a square.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Piece {
+    /// The piece's color.
     pub color: Color,
+    /// The piece's kind.
     pub role: Role,
 }
 
 /// Board square index `0..64`, `a1 = 0`, `b1 = 1`, …, `h8 = 63`.
+///
+/// # Example
+///
+/// ```
+/// use chess_diagram::Square;
+///
+/// let e4 = Square::from_algebraic("e4").unwrap();
+/// assert_eq!(e4.file(), 4);
+/// assert_eq!(e4.rank(), 3);
+/// assert_eq!(Square::from_algebraic("i9"), None);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Square(u8);
 
@@ -39,7 +60,8 @@ impl Square {
         (file < 8 && rank < 8).then(|| Square(rank * 8 + file))
     }
 
-    /// Parses algebraic notation like `"e4"`; `None` for anything else.
+    /// Parses algebraic notation like `"e4"`; `None` for anything else (wrong
+    /// length, out-of-range file/rank). Never panics on any input.
     pub fn from_algebraic(s: &str) -> Option<Square> {
         let bytes = s.as_bytes();
         if bytes.len() != 2 {
@@ -70,6 +92,8 @@ impl Square {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Board {
     pub(crate) squares: [Option<Piece>; 64],
+    /// The side to move, from the FEN's second field (default `White` if
+    /// absent).
     pub side_to_move: Color,
 }
 
