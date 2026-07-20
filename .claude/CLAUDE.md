@@ -16,8 +16,10 @@ Two layers behind one seam:
   format name and no SVG string ever appears in this layer.
 - **Renderer seam** — `src/render/mod.rs` defines `Renderer { format(),
   render() }` (modeled on mdcast's `Backend` trait); every output format is
-  one impl. v1 ships `SvgRenderer` (`src/render/svg.rs`, hand-emitted SVG
-  strings, `#[cfg(feature = "svg")]`). `src/options.rs` holds
+  one impl. v1 ships `SvgRenderer` (`src/render/svg/`, hand-emitted SVG
+  strings, `#[cfg(feature = "svg")]`), split into `mod.rs` (orchestration +
+  shared geometry), `grid.rs` (base squares + highlight/check overlays), and
+  `coordinates.rs` (file/rank labels). `src/options.rs` holds
   `Options`/`Theme`/`Format` shared by all impls.
 
 Extension seams:
@@ -42,6 +44,7 @@ Extension seams:
 | 2 | Package metadata + contents + license hygiene (`Cargo.toml` `exclude`, README image URLs) | done |
 | 2 | Release workflow: tag-triggered, crates.io Trusted Publishing (OIDC) | done |
 | 2 | Publish 0.1 to crates.io | done |
+| 3 | Split `src/render/svg.rs` into `src/render/svg/` submodule (annotations prereq) | done |
 | 3 | `pgn`/`png` features — only when a real consumer asks | deferred |
 
 ## Build & test
