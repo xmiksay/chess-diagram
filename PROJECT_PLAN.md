@@ -211,7 +211,7 @@ Cargo feature, never a teardown.
 | `pgn` feature | A consumer needs FEN-at-move-N and can't compute it (the site can, ChessBase already parses PGN) | One `pgn.rs` module gating `shakmaty`; core untouched. |
 | `png` feature | A consumer needs raster (thumbnail, non-SVG channel) | `render_png → Vec<u8>` via `resvg`, gated `png`. |
 | `typst` output | mdcast wants a native-typst board instead of an embedded SVG | New `Format::Typst` impl of the **same trait**; string output, no new dep. |
-| Arrows / annotations | Study/analysis rendering needs them (ChessBase) | Additive `Options` fields + SVG emission. |
+| ~~Arrows / annotations~~ | ~~Study/analysis rendering needs them (ChessBase)~~ | **Shipped in Phase 3**: `Options::shapes: Vec<Shape>` (`src/annotation.rs`), a `Shape`/`ArrowShape` model mirroring chessground's `Shape` field-for-field so a `study_set_shapes` payload forwards with no translation — circles, straight/knight-elbow arrows (`Shape::dest` + `ArrowShape::{Auto,Straight,Elbow}`), and text badges (`Shape::text`), each additive `SvgRenderer` emission (`src/render/svg/{shapes,arrows,text}.rs`). |
 | Custom piece sets / themes | Branding parity with a consumer's design | `Theme`/piece-set indirection already in `Options`; add variants. |
 
 **Hard rule:** the default feature set never gains a heavy dependency. Every
