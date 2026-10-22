@@ -16,8 +16,9 @@ check: ## Fast typecheck of all targets (all features)
 fmt: ## Apply formatting
 	cargo fmt
 
-lint: ## fmt-check + clippy (all features) with warnings as errors
+lint: ## fmt-check + clippy (default and all features) with warnings as errors
 	cargo fmt --check
+	cargo clippy --all-targets -- -D warnings
 	cargo clippy --all-targets --all-features -- -D warnings
 
 test-unit: ## Unit tests (in-module #[cfg(test)], all features)

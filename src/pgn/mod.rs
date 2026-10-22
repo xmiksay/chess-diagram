@@ -56,6 +56,8 @@ pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
         let mv = san
             .to_move(&pos)
             .ok_or_else(|| PgnError::IllegalMove(token.to_string()))?;
+        // `mv` came from the legal move list, so this can't fail today; kept
+        // over `play_unchecked` because that one panics on an illegal move.
         pos.try_play(mv)
             .map_err(|_| PgnError::IllegalMove(token.to_string()))?;
         played += 1;

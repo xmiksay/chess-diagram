@@ -113,7 +113,7 @@ Drive everything through the Makefile (`make help` lists all targets):
 make build              # debug build
 make check              # fast typecheck of all targets (all features)
 make test               # all tests (unit + doctest with --all-features, integration)
-make lint               # cargo fmt --check + clippy --all-targets --all-features -D warnings
+make lint               # cargo fmt --check + clippy --all-targets -D warnings (default and --all-features)
 make verify             # lint + test — the hard gate before any push
 make gallery            # regenerate the README gallery under assets/gallery/*.svg
 make golden-update      # rewrite tests/golden/*.svg from current renderer output
@@ -145,7 +145,9 @@ parse layer still compiles `thiserror`-only with every optional feature off)
 and `cargo test --all-features --all-targets` (exercises `pgn` and `png`
 together, and any future opt-in feature). Locally, `make lint`/`make test`
 already pass `--all-features` to clippy and the unit/doc tests, so the `pgn`
-and `png` modules are linted and tested by `make verify` too.
+and `png` modules are linted and tested by `make verify` too. Clippy also
+runs once on the default feature set (locally and in CI), so a lint that only
+fires when the opt-in features are off can't slip past the gate.
 
 ## Release procedure
 
