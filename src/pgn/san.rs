@@ -45,7 +45,8 @@ impl San {
                     matches += 1;
                 }
             }
-            false
+            // A second match already makes the SAN ambiguous; stop generating.
+            matches > 1
         });
         found.filter(|_| matches == 1)
     }

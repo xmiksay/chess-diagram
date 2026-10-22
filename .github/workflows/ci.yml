@@ -29,13 +29,13 @@ jobs:
         run: cargo check --all-targets
 
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Test
         run: cargo test --all-targets
 
       - name: Doctests
-        run: cargo test --doc
+        run: cargo test --doc --all-features
 
       - name: Doc build
         run: cargo doc --no-deps --lib

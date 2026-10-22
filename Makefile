@@ -16,18 +16,18 @@ check: ## Fast typecheck of all targets
 fmt: ## Apply formatting
 	cargo fmt
 
-lint: ## fmt-check + clippy with warnings as errors
+lint: ## fmt-check + clippy (all features) with warnings as errors
 	cargo fmt --check
-	cargo clippy --all-targets -- -D warnings
+	cargo clippy --all-targets --all-features -- -D warnings
 
-test-unit: ## Unit tests (in-module #[cfg(test)])
-	cargo test --lib
+test-unit: ## Unit tests (in-module #[cfg(test)], all features)
+	cargo test --lib --all-features
 
 test-integration: ## Integration tests (tests/integration.rs; writes target/test-samples/*.svg)
 	cargo test --test '*'
 
-test-doc: ## Doctests (lib.rs examples)
-	cargo test --doc
+test-doc: ## Doctests (all features)
+	cargo test --doc --all-features
 
 test: test-unit test-integration test-doc ## All tests (unit + integration + doctest)
 

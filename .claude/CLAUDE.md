@@ -101,9 +101,9 @@ Extension seams:
 | 3 | Arrow sizing: chessground-proportioned arrowhead (was 10× oversized), per-shape `Shape::width`, `Options::arrow_opacity` group transparency | done |
 | 3 | Per-square text badges (`Shape::text`, `src/render/svg/text.rs`) rendered above the arrows, XML-escaped | done |
 | 3 | `pgn` feature: `pgn::board_at` (FEN-at-move-N via `shakmaty`), `PgnError`, feature-matrix CI job | done |
-| 4 | `pgn` backend swap: GPL `shakmaty` → MIT `cozy-chess` + own SAN parser (`src/pgn/san.rs`), same API (0.2.1) | done |
 | 3 | `png` feature: `png::render_png` (SVG → PNG bytes via `resvg`, `src/png.rs`), `PngError`, system-fontdb text | done |
 | 3 | Theme presets: `Theme::brown()`/`blue()`/`green()` (plain constructors, `Theme` stays hand-constructible) | done |
+| 4 | `pgn` backend swap: GPL `shakmaty` → MIT `cozy-chess` + own SAN parser (`src/pgn/san.rs`), same API (0.2.1) | done |
 
 ## Build & test
 
@@ -112,8 +112,8 @@ Drive everything through the Makefile (`make help` lists all targets):
 ```bash
 make build              # debug build
 make check              # fast typecheck of all targets
-make test               # all tests (unit + integration + doctest)
-make lint               # cargo fmt --check + clippy --all-targets -D warnings
+make test               # all tests (unit + doctest with --all-features, integration)
+make lint               # cargo fmt --check + clippy --all-targets --all-features -D warnings
 make verify             # lint + test — the hard gate before any push
 make gallery            # regenerate the README gallery under assets/gallery/*.svg
 make golden-update      # rewrite tests/golden/*.svg from current renderer output
@@ -143,8 +143,9 @@ CI (`.github/workflows/ci.yml`) runs a `feature-matrix` job alongside the
 main `test` job: `cargo check --no-default-features --lib` (proves the bare
 parse layer still compiles `thiserror`-only with every optional feature off)
 and `cargo test --all-features --all-targets` (exercises `pgn` and `png`
-together, and any future opt-in feature). Run the `png` tests locally with
-`cargo test --features png`.
+together, and any future opt-in feature). Locally, `make lint`/`make test`
+already pass `--all-features` to clippy and the unit/doc tests, so the `pgn`
+and `png` modules are linted and tested by `make verify` too.
 
 ## Release procedure
 

@@ -217,7 +217,7 @@ Everything runs through the Makefile (`make help` lists all targets):
 ```bash
 make build      # debug build
 make test       # unit + integration + doctests
-make lint       # cargo fmt --check + clippy -D warnings
+make lint       # cargo fmt --check + clippy --all-features -D warnings
 make verify     # lint + test — the hard gate before any push
 make gallery    # regenerate the README gallery under assets/gallery/*.svg
 ```

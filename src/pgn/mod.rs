@@ -50,23 +50,22 @@ pub enum PgnError {
 /// ```
 pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
     let mut pos = cozy_chess::Board::startpos();
-    for (played, token) in mainline_sans(pgn).enumerate() {
-        if played == ply {
-            break;
-        }
+    let mut played = 0;
+    for token in mainline_sans(pgn).take(ply) {
         let san = San::parse(token).ok_or_else(|| PgnError::InvalidSan(token.to_string()))?;
         let mv = san
             .to_move(&pos)
             .ok_or_else(|| PgnError::IllegalMove(token.to_string()))?;
         pos.try_play(mv)
             .map_err(|_| PgnError::IllegalMove(token.to_string()))?;
+        played += 1;
     }
 
-    let available = mainline_sans(pgn).count();
-    if ply > available {
+    // `take(ply)` only stops short when the mainline runs out.
+    if played < ply {
         return Err(PgnError::PlyOutOfRange {
             requested: ply,
-            available,
+            available: played,
         });
     }
 
