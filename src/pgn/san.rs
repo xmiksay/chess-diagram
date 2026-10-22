@@ -175,23 +175,16 @@ impl Reader<'_> {
 }
 
 fn parse_file(byte: u8) -> Option<File> {
-    matches!(byte, b'a'..=b'h').then(|| File::index(usize::from(byte - b'a')))
+    File::try_from(char::from(byte)).ok()
 }
 
 fn parse_rank(byte: u8) -> Option<Rank> {
-    matches!(byte, b'1'..=b'8').then(|| Rank::index(usize::from(byte - b'1')))
+    Rank::try_from(char::from(byte)).ok()
 }
 
+/// Either case, like shakmaty's `Role::from_char` (cozy-chess is lowercase-only).
 fn parse_role(byte: u8) -> Option<Piece> {
-    match byte.to_ascii_uppercase() {
-        b'P' => Some(Piece::Pawn),
-        b'N' => Some(Piece::Knight),
-        b'B' => Some(Piece::Bishop),
-        b'R' => Some(Piece::Rook),
-        b'Q' => Some(Piece::Queen),
-        b'K' => Some(Piece::King),
-        _ => None,
-    }
+    Piece::try_from(char::from(byte.to_ascii_lowercase())).ok()
 }
 
 #[cfg(test)]

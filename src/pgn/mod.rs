@@ -118,36 +118,35 @@ fn convert_role(role: cozy_chess::Piece) -> Role {
 /// word-by-word with brace/paren depth tracked across words so a comment or
 /// variation spanning several words is skipped in full.
 fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
-    let mut brace_depth: u32 = 0;
-    let mut paren_depth: u32 = 0;
     pgn.lines()
         .filter(|line| !line.trim_start().starts_with('['))
         .flat_map(str::split_whitespace)
-        .filter_map(move |word| {
-            if brace_depth > 0 || word.starts_with('{') {
-                brace_depth = brace_depth
+        // `scan` (not `filter_map`) so a result token can end the iteration:
+        // anything after it (e.g. a second concatenated game) must not be
+        // played onto this board. `Some(None)` skips a word, `None` stops.
+        .scan((0u32, 0u32), |(brace_depth, paren_depth), word| {
+            if *brace_depth > 0 || word.starts_with('{') {
+                *brace_depth = brace_depth
                     .saturating_add(word.matches('{').count() as u32)
                     .saturating_sub(word.matches('}').count() as u32);
-                return None;
+                return Some(None);
             }
-            if paren_depth > 0 || word.starts_with('(') {
-                paren_depth = paren_depth
+            if *paren_depth > 0 || word.starts_with('(') {
+                *paren_depth = paren_depth
                     .saturating_add(word.matches('(').count() as u32)
                     .saturating_sub(word.matches(')').count() as u32);
-                return None;
-            }
-            if word.starts_with('$') {
-                return None;
+                return Some(None);
             }
             if matches!(word, "1-0" | "0-1" | "1/2-1/2" | "*") {
                 return None;
             }
-            let san = word.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.');
-            if san.is_empty() {
-                return None;
+            if word.starts_with('$') {
+                return Some(None);
             }
-            Some(san)
+            let san = word.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.');
+            Some((!san.is_empty()).then_some(san))
         })
+        .flatten()
 }
 
 #[cfg(test)]
@@ -264,6 +263,20 @@ mod tests {
     fn result_token_ends_mainline() {
         let available = mainline_sans("1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0").count();
         assert_eq!(available, 7);
+        // A second concatenated game after the result is not part of this mainline.
+        let two_games = "1. e4 e5 1-0\n\n[Event \"Next\"]\n1. d4 d5 *";
+        assert_eq!(
+            board_at(two_games, 3),
+            Err(PgnError::PlyOutOfRange {
+                requested: 3,
+                available: 2
+            })
+        );
+        // Inside a comment or variation a result-looking word doesn't end it.
+        assert_eq!(
+            mainline_sans("1. e4 { 1-0 } e5 (1... c5 *) 2. Nf3").count(),
+            3
+        );
     }
 
     #[test]

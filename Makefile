@@ -38,8 +38,8 @@ golden-update: ## Rewrite tests/golden/*.svg fixtures from the current renderer 
 gallery: ## Regenerate the README gallery under assets/gallery/*.svg
 	cargo run --example gallery
 
-doc: ## Build rustdoc
-	cargo doc --no-deps
+doc: ## Build rustdoc (all features, warnings as errors — same as CI and docs.rs)
+	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --lib --all-features
 
 package: ## Dry-run crates.io packaging
 	cargo package --allow-dirty
