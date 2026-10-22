@@ -36,9 +36,15 @@ impl San {
     /// Resolves to the unique legal move this SAN names in `board`; `None`
     /// when no legal move matches or the match is ambiguous.
     pub(super) fn to_move(self, board: &Board) -> Option<Move> {
+        // Only the named piece type can match, so skip generating the rest.
+        let role = match self {
+            San::Normal { role, .. } => role,
+            San::Castle { .. } => Piece::King,
+            San::Unplayable => return None,
+        };
         let mut found = None;
         let mut matches = 0usize;
-        board.generate_moves(|moves| {
+        board.generate_moves_for(board.pieces(role), |moves| {
             for mv in moves {
                 if self.matches(board, moves.piece, mv) {
                     found = Some(mv);

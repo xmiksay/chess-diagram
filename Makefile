@@ -10,8 +10,8 @@ help: ## Show this help
 build: ## Debug build (library)
 	cargo build
 
-check: ## Fast typecheck of all targets
-	cargo check --all-targets
+check: ## Fast typecheck of all targets (all features)
+	cargo check --all-targets --all-features
 
 fmt: ## Apply formatting
 	cargo fmt
