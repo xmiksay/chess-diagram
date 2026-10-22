@@ -38,14 +38,16 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
                 variation_depth = variation_depth.saturating_sub(1);
                 after
             }
-            '$' => after.trim_start_matches(|c: char| c.is_ascii_digit()),
-            // Import-format suffix annotations (`e4!`, `Nf3?!`).
-            '!' | '?' => after.trim_start_matches(['!', '?']),
+            // A NAG is `$<digits>`; a malformed one is still dropped whole.
+            '$' => after.trim_start_matches(|c: char| !is_delimiter(c)),
+            // Import-format suffix annotations (`e4!`, `Nf3?!`), plus a check
+            // marker written after one (`Bb5?+`) — the SAN already ended.
+            '!' | '?' => after.trim_start_matches(['!', '?', '+', '#']),
             _ => {
                 let end = trimmed
                     .char_indices()
                     .skip(1)
-                    .find(|&(_, c)| c.is_whitespace() || "{}();[$!?".contains(c))
+                    .find(|&(_, c)| is_delimiter(c))
                     .map_or(trimmed.len(), |(i, _)| i);
                 let (symbol, tail) = trimmed.split_at_checked(end)?;
                 rest = tail;
@@ -71,6 +73,11 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
             }
         };
     })
+}
+
+/// Ends a move symbol: whitespace or a self-terminating PGN token start.
+fn is_delimiter(c: char) -> bool {
+    c.is_whitespace() || "{}();[$!?".contains(c)
 }
 
 fn skip_line(s: &str) -> &str {
@@ -168,8 +175,8 @@ mod tests {
     #[test]
     fn suffix_annotations_are_skipped() {
         assert_eq!(
-            sans("1. e4! e5?! 2. Nf3!! Nc6 ? 3. Bb5+?"),
-            ["e4", "e5", "Nf3", "Nc6", "Bb5+"]
+            sans("1. e4! e5?! 2. Nf3!! Nc6 ? 3. Bb5+? a6 4. Ba4?+ b5"),
+            ["e4", "e5", "Nf3", "Nc6", "Bb5+", "a6", "Ba4", "b5"]
         );
     }
 
@@ -182,6 +189,11 @@ mod tests {
     #[test]
     fn move_numbers_strip_but_zero_castling_stays_whole() {
         assert_eq!(sans("1.e4 1...e5 2 Nf3 0-0"), ["e4", "e5", "Nf3", "0-0"]);
+    }
+
+    #[test]
+    fn malformed_nag_is_dropped_whole() {
+        assert_eq!(sans("1. e4 $x e5 $12a{c} Nf3"), ["e4", "e5", "Nf3"]);
     }
 
     #[test]
