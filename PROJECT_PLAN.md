@@ -143,7 +143,7 @@ chess-diagram/
 │  │     ├─ grid.rs           # base squares + highlight/check overlay rects
 │  │     └─ coordinates.rs    # file/rank coordinate labels
 │  ├─ pieces.rs               # Cburnett BSD piece SVG path consts (feature = "svg")
-│  └─ pgn.rs                  # #[cfg(feature = "pgn")] FEN-at-move-N (gates shakmaty)
+│  └─ pgn/                    # #[cfg(feature = "pgn")] FEN-at-move-N (gates cozy-chess; own SAN parser)
 ├─ examples/gallery.rs        # render sample FENs to files (doc gallery)
 ├─ tests/golden/              # snapshot fixtures (start pos, mid-game, mate, flipped)
 ├─ assets/LICENSE-pieces      # Cburnett BSD notice
@@ -156,12 +156,12 @@ chess-diagram/
 [features]
 default = ["svg"]
 svg   = []                 # hand-emitted SVG + embedded piece consts (no deps)
-pgn   = ["dep:shakmaty"]   # walk a PGN to move N → FEN; opt-in heavy dep
+pgn   = ["dep:cozy-chess"] # walk a PGN to move N → FEN; opt-in
 png   = ["svg", "dep:resvg"] # rasterise SVG → PNG bytes; opt-in
 
 [dependencies]
 thiserror = "2"
-shakmaty  = { version = "0.27", optional = true }
+cozy-chess = { version = "0.3", optional = true }
 resvg     = { version = "0.44", optional = true }
 ```
 
@@ -208,14 +208,14 @@ Cargo feature, never a teardown.
 
 | Future move | Trigger (not "nice to have") | Scope when taken |
 |---|---|---|
-| ~~`pgn` feature~~ | ~~A consumer needs FEN-at-move-N and can't compute it (the site can, ChessBase already parses PGN)~~ | **Shipped in Phase 3**: `pgn::board_at(pgn, ply) -> Result<Board, PgnError>` (`src/pgn.rs`, `#[cfg(feature = "pgn")]`) walks a PGN mainline via `shakmaty` (SAN disambiguation, castling, en passant, promotion) and converts its position into this crate's `Board`; core untouched, `PgnError` stays separate from `FenError`. |
+| ~~`pgn` feature~~ | ~~A consumer needs FEN-at-move-N and can't compute it (the site can, ChessBase already parses PGN)~~ | **Shipped in Phase 3**: `pgn::board_at(pgn, ply) -> Result<Board, PgnError>` (`src/pgn.rs`, `#[cfg(feature = "pgn")]`) walks a PGN mainline via `shakmaty` (SAN disambiguation, castling, en passant, promotion) and converts its position into this crate's `Board`; core untouched, `PgnError` stays separate from `FenError`. **0.2.1** swapped the backend: `shakmaty` is GPL-3.0-or-later, which made any `pgn`-enabled binary GPL despite this crate's MIT license, so it was replaced by MIT `cozy-chess` (move generation) plus an in-crate SAN parser (`src/pgn/san.rs`) that mirrors shakmaty 0.30's grammar — same API, same accepted input, same error kinds. |
 | ~~`png` feature~~ | ~~A consumer needs raster (thumbnail, non-SVG channel)~~ | **Shipped in Phase 3**: `png::render_png(fen, opts) -> Result<Vec<u8>, PngError>` (`src/png.rs`, `#[cfg(feature = "png")]`, implies `svg`) renders via `render_svg` then rasterises with `resvg`/`usvg`/`tiny-skia`, loading system fonts through `fontdb` for the `sans-serif` coordinate/badge text; `PngError` stays separate from `FenError`. |
 | `typst` output | mdcast wants a native-typst board instead of an embedded SVG | New `Format::Typst` impl of the **same trait**; string output, no new dep. |
 | ~~Arrows / annotations~~ | ~~Study/analysis rendering needs them (ChessBase)~~ | **Shipped in Phase 3**: `Options::shapes: Vec<Shape>` (`src/annotation.rs`), a `Shape`/`ArrowShape` model mirroring chessground's `Shape` field-for-field so a `study_set_shapes` payload forwards with no translation — circles, straight/knight-elbow arrows (`Shape::dest` + `ArrowShape::{Auto,Straight,Elbow}`), and text badges (`Shape::text`), each additive `SvgRenderer` emission (`src/render/svg/{shapes,arrows,text}.rs`). |
 | ~~Custom themes~~ | ~~Branding parity with a consumer's design~~ | **Shipped in Phase 3**: `Theme::brown()`/`blue()`/`green()` presets (`src/options.rs`) — plain constructors alongside the existing hand-constructible `Theme` struct; `brown()` matches `Theme::default()` byte-for-byte. Piece-set indirection remains unshipped — no second set has a license-clean source yet; add it only when one does. |
 
 **Hard rule:** the default feature set never gains a heavy dependency. Every
-engine-grade dep (typst, shakmaty, resvg) lives behind an opt-in feature. That
+engine-grade dep (typst, cozy-chess, resvg) lives behind an opt-in feature. That
 is the whole point of "footprint like `mermaid-svg`."
 
 ## 11. Downstream consumers (why this earns its place)

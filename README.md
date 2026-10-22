@@ -186,7 +186,7 @@ loading — those belong to the consumers.
   | Feature | Default | Adds | Gives you |
   |---|---|---|---|
   | `svg` | yes | nothing (pure Rust) | `SvgRenderer`, `render_svg` |
-  | `pgn` | no | `shakmaty` | `pgn::board_at(pgn, ply)` — walk a PGN mainline to a ply, get a `Board` to render |
+  | `pgn` | no | `cozy-chess` (MIT, no transitive deps beyond its own types crate) | `pgn::board_at(pgn, ply)` — walk a PGN mainline to a ply, get a `Board` to render |
   | `png` | no | `resvg` (implies `svg`) | `png::render_png(fen, opts)` — rasterise to `Options::size`-square PNG bytes |
 
   With `features = ["pgn"]`:

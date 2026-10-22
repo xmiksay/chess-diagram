@@ -44,11 +44,17 @@ Two layers behind one seam:
   all impls; `src/annotation.rs` holds the `Shape`/`ArrowShape` annotation
   model (mirrors chessground's `Shape` — not part of `board.rs`, since
   annotations are a rendering concern).
-- **PGN layer** — `src/pgn.rs` (`#[cfg(feature = "pgn")]`, opt-in): `pub fn
-  board_at(pgn: &str, ply: usize) -> Result<Board, PgnError>` walks a PGN
-  mainline via `shakmaty` (SAN disambiguation, castling, en passant,
-  promotion all delegated to it) and converts `shakmaty`'s `Board`/`Color`/
-  `Role`/`Piece` into this crate's model. `mainline_sans` tokenizes the
+- **PGN layer** — `src/pgn/` (`#[cfg(feature = "pgn")]`, opt-in): `pub fn
+  board_at(pgn: &str, ply: usize) -> Result<Board, PgnError>` (`mod.rs`)
+  walks a PGN mainline on a `cozy-chess` board and converts its
+  `Color`/`Piece` into this crate's model. `san.rs` is our own SAN parser —
+  grammar deliberately mirrors shakmaty 0.30's `San::from_ascii` (the
+  previous, GPL backend) so the swap changed no accepted input or error
+  kind — and resolves a SAN to the unique matching move from cozy-chess's
+  legal move generator (disambiguation, capture marker, promotion must all
+  match; an ambiguous SAN is `IllegalMove`). cozy-chess encodes castling as
+  the king capturing its own rook, so `O-O`/`O-O-O` match that king move and
+  a plain `K` SAN never does. `mainline_sans` tokenizes the
   movetext (drops header-tag lines whole since a quoted value may contain
   whitespace; tracks brace/paren depth across words so multi-word comments
   and variations are skipped in full; stops at a result token). Errors are
@@ -70,7 +76,7 @@ Extension seams:
 - **New output format** = new `Format` variant (the enum is
   `#[non_exhaustive]`) + one new `Renderer` impl under `src/render/`. Never a
   parse-layer change.
-- **Heavier capability** = opt-in Cargo feature: `pgn` (gates `shakmaty`) and
+- **Heavier capability** = opt-in Cargo feature: `pgn` (gates `cozy-chess`) and
   `png` (gates `resvg`, implies `svg`), both landed. **The default feature set
   never gains a heavy dependency.**
 
@@ -95,6 +101,7 @@ Extension seams:
 | 3 | Arrow sizing: chessground-proportioned arrowhead (was 10× oversized), per-shape `Shape::width`, `Options::arrow_opacity` group transparency | done |
 | 3 | Per-square text badges (`Shape::text`, `src/render/svg/text.rs`) rendered above the arrows, XML-escaped | done |
 | 3 | `pgn` feature: `pgn::board_at` (FEN-at-move-N via `shakmaty`), `PgnError`, feature-matrix CI job | done |
+| 4 | `pgn` backend swap: GPL `shakmaty` → MIT `cozy-chess` + own SAN parser (`src/pgn/san.rs`), same API (0.2.1) | done |
 | 3 | `png` feature: `png::render_png` (SVG → PNG bytes via `resvg`, `src/png.rs`), `PngError`, system-fontdb text | done |
 | 3 | Theme presets: `Theme::brown()`/`blue()`/`green()` (plain constructors, `Theme` stays hand-constructible) | done |
 
