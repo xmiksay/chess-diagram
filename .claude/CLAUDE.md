@@ -54,10 +54,13 @@ Two layers behind one seam:
   legal move generator (disambiguation, capture marker, promotion must all
   match; an ambiguous SAN is `IllegalMove`). cozy-chess encodes castling as
   the king capturing its own rook, so `O-O`/`O-O-O` match that king move and
-  a plain `K` SAN never does. `mainline_sans` tokenizes the
-  movetext (drops header-tag lines whole since a quoted value may contain
-  whitespace; tracks brace/paren depth across words so multi-word comments
-  and variations are skipped in full; stops at a result token). Errors are
+  a plain `K` SAN never does. `movetext.rs`'s `mainline_sans` is a
+  character-level lexer over the PGN (PGN delimiters are self-terminating,
+  so a word/line splitter mis-handles glued comments like `e4{best}`): it
+  skips `[Tag "value"]` pairs (quote-aware), `{...}` comments (non-nesting,
+  may span lines), `;` rest-of-line comments, column-0 `%` escape lines,
+  `$n` NAGs, move numbers and nested `(...)` variations, and stops for good
+  at a result token. Errors are
   `PgnError`, a type separate from `FenError` — this module never touches
   the parse layer or its error contract.
 - **PNG layer** — `src/png.rs` (`#[cfg(feature = "png")]`, opt-in, implies

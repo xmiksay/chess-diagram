@@ -5,11 +5,13 @@
 //! [`Board`]. Never touches the default (`FenError`-only) parse layer
 //! contract — errors here are [`PgnError`], a separate type.
 
+mod movetext;
 mod san;
 
 use thiserror::Error;
 
 use crate::board::{Board, Color, Piece, Role};
+use movetext::mainline_sans;
 use san::San;
 
 /// Errors from walking a PGN movetext. Kept separate from [`FenError`](crate::FenError)
@@ -35,9 +37,10 @@ pub enum PgnError {
 /// Walks `pgn`'s mainline to half-move `ply` (`0` = the starting position,
 /// `1` = after White's first move, …) and returns the resulting [`Board`].
 ///
-/// Only the mainline is walked: comments (`{...}`), variations (`(...)`),
-/// NAGs (`$1`), move numbers, and headers are skipped; a game-result token
-/// (`1-0`, `0-1`, `1/2-1/2`, `*`) ends the mainline.
+/// Only the mainline is walked: comments (`{...}`, `;`), `%` escape lines,
+/// variations (`(...)`), NAGs (`$1`), move numbers, and tag pairs are
+/// skipped; a game-result token (`1-0`, `0-1`, `1/2-1/2`, `*`) ends the
+/// mainline.
 ///
 /// # Example
 ///
@@ -108,45 +111,6 @@ fn convert_role(role: cozy_chess::Piece) -> Role {
         cozy_chess::Piece::Queen => Role::Queen,
         cozy_chess::Piece::King => Role::King,
     }
-}
-
-/// Yields SAN move tokens from a PGN's mainline, skipping header tags,
-/// move numbers, comments, variations, NAGs, and the trailing result token.
-///
-/// Header tag lines (`[Event "..."]`) are dropped whole, since a quoted tag
-/// value may itself contain whitespace; everything else is tokenized
-/// word-by-word with brace/paren depth tracked across words so a comment or
-/// variation spanning several words is skipped in full.
-fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
-    pgn.lines()
-        .filter(|line| !line.trim_start().starts_with('['))
-        .flat_map(str::split_whitespace)
-        // `scan` (not `filter_map`) so a result token can end the iteration:
-        // anything after it (e.g. a second concatenated game) must not be
-        // played onto this board. `Some(None)` skips a word, `None` stops.
-        .scan((0u32, 0u32), |(brace_depth, paren_depth), word| {
-            if *brace_depth > 0 || word.starts_with('{') {
-                *brace_depth = brace_depth
-                    .saturating_add(word.matches('{').count() as u32)
-                    .saturating_sub(word.matches('}').count() as u32);
-                return Some(None);
-            }
-            if *paren_depth > 0 || word.starts_with('(') {
-                *paren_depth = paren_depth
-                    .saturating_add(word.matches('(').count() as u32)
-                    .saturating_sub(word.matches(')').count() as u32);
-                return Some(None);
-            }
-            if matches!(word, "1-0" | "0-1" | "1/2-1/2" | "*") {
-                return None;
-            }
-            if word.starts_with('$') {
-                return Some(None);
-            }
-            let san = word.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.');
-            Some((!san.is_empty()).then_some(san))
-        })
-        .flatten()
 }
 
 #[cfg(test)]
@@ -261,8 +225,6 @@ mod tests {
 
     #[test]
     fn result_token_ends_mainline() {
-        let available = mainline_sans("1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0").count();
-        assert_eq!(available, 7);
         // A second concatenated game after the result is not part of this mainline.
         let two_games = "1. e4 e5 1-0\n\n[Event \"Next\"]\n1. d4 d5 *";
         assert_eq!(
@@ -271,11 +233,6 @@ mod tests {
                 requested: 3,
                 available: 2
             })
-        );
-        // Inside a comment or variation a result-looking word doesn't end it.
-        assert_eq!(
-            mainline_sans("1. e4 { 1-0 } e5 (1... c5 *) 2. Nf3").count(),
-            3
         );
     }
 
