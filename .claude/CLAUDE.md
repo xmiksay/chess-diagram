@@ -59,8 +59,8 @@ Two layers behind one seam:
   so a word/line splitter mis-handles glued comments like `e4{best}`): it
   skips `[Tag "value"]` pairs (quote-aware), `{...}` comments (non-nesting,
   may span lines), `;` rest-of-line comments, column-0 `%` escape lines,
-  `$n` NAGs, move numbers and nested `(...)` variations, and stops for good
-  at a result token. Errors are
+  `$n` NAGs, `!`/`?` suffix annotations, a leading BOM, move numbers and
+  nested `(...)` variations, and stops for good at a result token. Errors are
   `PgnError`, a type separate from `FenError` — this module never touches
   the parse layer or its error contract.
 - **PNG layer** — `src/png.rs` (`#[cfg(feature = "png")]`, opt-in, implies

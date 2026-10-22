@@ -38,9 +38,9 @@ pub enum PgnError {
 /// `1` = after White's first move, …) and returns the resulting [`Board`].
 ///
 /// Only the mainline is walked: comments (`{...}`, `;`), `%` escape lines,
-/// variations (`(...)`), NAGs (`$1`), move numbers, and tag pairs are
-/// skipped; a game-result token (`1-0`, `0-1`, `1/2-1/2`, `*`) ends the
-/// mainline.
+/// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, move
+/// numbers, and tag pairs are skipped; a game-result token (`1-0`, `0-1`,
+/// `1/2-1/2`, `*`) ends the mainline.
 ///
 /// # Example
 ///
@@ -290,6 +290,12 @@ mod tests {
     }
 
     #[test]
+    fn annotated_moves_play() {
+        let board = board_at("1. e4! e5?! 2. Nf3!! Nc6", 4).expect("valid PGN");
+        assert_eq!(board.side_to_move, Color::White);
+    }
+
+    #[test]
     fn ply_out_of_range() {
         assert_eq!(
             board_at("1. e4 e5", 5),
@@ -310,8 +316,7 @@ mod tests {
 
     #[test]
     fn illegal_move() {
-        // Nc3 isn't legal here — no knight can reach c3 from the start position via this SAN? Use a
-        // syntactically valid but illegal SAN instead: Ke2 with the king boxed in at move 1.
+        // Syntactically valid but illegal: the king is boxed in at move 1.
         assert_eq!(
             board_at("1. Ke2", 1),
             Err(PgnError::IllegalMove("Ke2".to_string()))

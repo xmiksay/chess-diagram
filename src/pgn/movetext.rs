@@ -4,10 +4,13 @@
 //! `[` (`{ ...\n[%clk 0:03:00] }`), or contain `)`, `{` and `;` literally.
 
 /// Yields SAN move tokens from a PGN's mainline, skipping tag pairs, move
-/// numbers, `{...}` and `;` comments, `%` escape lines, variations, and NAGs.
-/// A game-result token (`1-0`, `0-1`, `1/2-1/2`, `*`) ends the mainline, so
-/// a second concatenated game is never played onto the first one's board.
+/// numbers, `{...}` and `;` comments, `%` escape lines, variations, NAGs, and
+/// `!`/`?` suffix annotations. A game-result token (`1-0`, `0-1`, `1/2-1/2`,
+/// `*`) ends the mainline, so a second concatenated game is never played onto
+/// the first one's board.
 pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
+    // Editors on Windows prepend a BOM, which isn't whitespace to `trim_start`.
+    let pgn = pgn.strip_prefix('\u{feff}').unwrap_or(pgn);
     let mut rest = pgn;
     let mut variation_depth = 0u32;
     std::iter::from_fn(move || loop {
@@ -36,11 +39,13 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
                 after
             }
             '$' => after.trim_start_matches(|c: char| c.is_ascii_digit()),
+            // Import-format suffix annotations (`e4!`, `Nf3?!`).
+            '!' | '?' => after.trim_start_matches(['!', '?']),
             _ => {
                 let end = trimmed
                     .char_indices()
                     .skip(1)
-                    .find(|&(_, c)| c.is_whitespace() || "{}();[$".contains(c))
+                    .find(|&(_, c)| c.is_whitespace() || "{}();[$!?".contains(c))
                     .map_or(trimmed.len(), |(i, _)| i);
                 let (symbol, tail) = trimmed.split_at_checked(end)?;
                 rest = tail;
@@ -51,7 +56,14 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
                     rest = "";
                     return None;
                 }
-                let san = symbol.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.');
+                // Strip a move number (`12.`, `12...`, bare `12`) but not the
+                // digits of a non-SAN token like `0-0`, so its error names it whole.
+                let unnumbered = symbol.trim_start_matches(|c: char| c.is_ascii_digit());
+                let san = if unnumbered.is_empty() || unnumbered.starts_with('.') {
+                    unnumbered.trim_start_matches('.')
+                } else {
+                    symbol
+                };
                 if san.is_empty() {
                     continue;
                 }
@@ -151,6 +163,25 @@ mod tests {
         );
         // `%` is only an escape in column 0.
         assert_eq!(sans("1. e4 %x"), ["e4", "%x"]);
+    }
+
+    #[test]
+    fn suffix_annotations_are_skipped() {
+        assert_eq!(
+            sans("1. e4! e5?! 2. Nf3!! Nc6 ? 3. Bb5+?"),
+            ["e4", "e5", "Nf3", "Nc6", "Bb5+"]
+        );
+    }
+
+    #[test]
+    fn leading_bom_is_ignored() {
+        assert_eq!(sans("\u{feff}[Event \"x\"]\n1. e4"), ["e4"]);
+        assert_eq!(sans("\u{feff}% escape\n1. e4"), ["e4"]);
+    }
+
+    #[test]
+    fn move_numbers_strip_but_zero_castling_stays_whole() {
+        assert_eq!(sans("1.e4 1...e5 2 Nf3 0-0"), ["e4", "e5", "Nf3", "0-0"]);
     }
 
     #[test]
