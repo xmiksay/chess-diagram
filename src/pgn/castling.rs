@@ -37,18 +37,21 @@ pub(super) fn with_castling(board: &Board, field: &str, variant: Variant) -> Opt
 }
 
 /// The variant a castling field implies on its own, for a FEN exported
-/// without a `Variant` tag: Chess960 when every right it grants exists there
-/// and some only exists there (a king off the e-file, or a rook off a/h —
-/// e.g. Shredder `GEge`), else standard. A blanket `KQkq` on a standard
-/// board with a castled king (`5RK1`: `Q` fits Chess960's f-rook, `K` fits
-/// nothing) has an unsupportable letter, so it implies nothing rather than
-/// granting the king a bogus `O-O-O`.
+/// without a `Variant` tag: Chess960 when a rook named by its file letter
+/// (Shredder `GEge`) can castle only under Chess960 rules, else standard.
+/// `K`/`Q` letters never imply anything: puzzle generators write a blanket
+/// `KQkq` whatever the position, so `KQkq` around an f-file king is as
+/// likely a sloppy standard FEN as a Chess960 one, and inferring Chess960
+/// there would grant bogus castling. A file letter is deliberate notation.
 pub(super) fn implied_variant(board: &Board, field: &str) -> Variant {
-    let right =
-        |c: char, variant| castling_right(board, color_of(c), c.to_ascii_lowercase(), variant);
-    let chess960 = field.chars().all(|c| right(c, Variant::Chess960).is_some())
-        && field.chars().any(|c| right(c, Variant::Standard).is_none());
-    if chess960 {
+    let chess960_only = field.chars().filter(char::is_ascii_alphabetic).any(|c| {
+        let letter = c.to_ascii_lowercase();
+        let right = |variant| castling_right(board, color_of(c), letter, variant);
+        !matches!(letter, 'k' | 'q')
+            && right(Variant::Chess960).is_some()
+            && right(Variant::Standard).is_none()
+    });
+    if chess960_only {
         Variant::Chess960
     } else {
         Variant::Standard
@@ -151,6 +154,28 @@ mod tests {
             "4k3/8/8/8/8/8/8/R3K2R w K1 - 0 1",
         ] {
             assert_eq!(rights(fen, Variant::Chess960), None, "{fen}");
+        }
+    }
+
+    #[test]
+    fn implied_variant_needs_a_chess960_only_file_letter() {
+        let implied = |placement: &str, field: &str| {
+            let board =
+                Board::from_fen(&format!("{placement} w - - 0 1"), false).expect("valid placement");
+            implied_variant(&board, field)
+        };
+        let c960 = "bqnbrkrn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRKRN";
+        assert_eq!(implied(c960, "GEge"), Variant::Chess960);
+        // A stale letter (Black castled, `e` fits nothing) doesn't undo it.
+        assert_eq!(implied(c960, "GEe"), Variant::Chess960);
+        // `K`/`Q` never infer: this is also a sloppy standard puzzle shape.
+        assert_eq!(implied(c960, "KQkq"), Variant::Standard);
+        for placement in ["r3k2r/8/8/8/8/8/8/R4K1R", "r3k2r/8/8/8/8/8/8/5RK1"] {
+            assert_eq!(implied(placement, "KQkq"), Variant::Standard);
+        }
+        // Standard-fitting rights, an empty field, a malformed one.
+        for field in ["KQkq", "HAha", "-", "X"] {
+            assert_eq!(implied("r3k2r/8/8/8/8/8/8/R3K2R", field), Variant::Standard);
         }
     }
 

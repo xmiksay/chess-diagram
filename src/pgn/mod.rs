@@ -38,9 +38,10 @@ use start::start_position;
 /// outermost rook) or Shredder-FEN (`HAha`) castling rights and resolves
 /// `O-O`/`O-O-O` by rook side. Names compare ignoring case, whitespace, `-`
 /// and `_`. Without a `FEN` tag Chess960 starts from the standard position
-/// (Chess960 position 518). Without a `Variant` tag, a FEN whose castling
-/// rights all fit Chess960 and some fit only it (Shredder `GEge`, `KQkq`
-/// around a king off the e-file) is read as Chess960.
+/// (Chess960 position 518). Without a `Variant` tag, a FEN whose
+/// Shredder-FEN castling letters name a rook only Chess960 can castle with
+/// (`GEge`) is read as Chess960; `KQkq` never is, since a sloppy standard
+/// puzzle FEN looks the same — add `[Variant "Chess960"]` for X-FEN games.
 ///
 /// FEN fields that can't change the board are read leniently: castling rights
 /// the position can't support (a blanket `KQkq` with no rooks, a non-standard

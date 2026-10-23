@@ -113,6 +113,9 @@ mod tests {
     use crate::pgn::board_at;
 
     const START: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w";
+    /// A Chess960 start (king f1, rooks e1/g1) and the board after both sides `O-O`.
+    const C960_START: &str = "bqnbrkrn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRKRN";
+    const C960_CASTLED: &str = "bqnbrrkn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRRKN w";
 
     /// `board_at(pgn, ply)` equals the position `expected` (placement + side).
     fn assert_board(pgn: &str, ply: usize, expected: &str) {
@@ -250,10 +253,9 @@ mod tests {
         let pgn = c960("4k3/8/8/8/8/8/8/RRK5 w B - 0 1", "1. O-O-O");
         assert_board(&pgn, 1, "4k3/8/8/8/8/8/8/R1KR4 b");
         // Black, from a full Chess960 start position (Shredder and X-FEN agree).
-        let start = "bqnbrkrn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRKRN";
         for rights in ["GEge", "KQkq"] {
-            let pgn = c960(&format!("{start} w {rights} - 0 1"), "1. O-O O-O");
-            assert_board(&pgn, 2, "bqnbrrkn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRRKN w");
+            let pgn = c960(&format!("{C960_START} w {rights} - 0 1"), "1. O-O O-O");
+            assert_board(&pgn, 2, C960_CASTLED);
         }
     }
 
@@ -268,15 +270,23 @@ mod tests {
 
     #[test]
     fn chess960_is_inferred_from_an_unambiguous_castling_field() {
-        let start = "bqnbrkrn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRKRN";
-        let castled = "bqnbrrkn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRRKN w";
-        // No Variant tag: Shredder `GEge`, or X-FEN `KQkq` with an f-file king.
-        for rights in ["GEge", "KQkq"] {
-            let pgn = format!("[FEN \"{start} w {rights} - 0 1\"]\n1. O-O O-O");
-            assert_board(&pgn, 2, castled);
-        }
+        // No Variant tag: Shredder `GEge` is read as Chess960...
+        let pgn = format!("[FEN \"{C960_START} w GEge - 0 1\"]\n1. O-O O-O");
+        assert_board(&pgn, 2, C960_CASTLED);
+        // ...but X-FEN `KQkq` isn't (a sloppy standard puzzle looks the same).
+        let pgn = format!("[FEN \"{C960_START} w KQkq - 0 1\"]\n1. O-O");
+        assert_eq!(
+            board_at(&pgn, 1),
+            Err(PgnError::IllegalMove("O-O".to_string()))
+        );
+        // A standard puzzle: king stepped to f1, blanket `KQkq`, no castling.
+        let pgn = "[FEN \"r3k2r/8/8/8/8/8/8/R4K1R w KQkq - 0 1\"]\n1. O-O";
+        assert_eq!(
+            board_at(pgn, 1),
+            Err(PgnError::IllegalMove("O-O".to_string()))
+        );
         // An explicit standard Variant tag still wins: the rights are dropped.
-        let pgn = format!("[Variant \"Standard\"]\n[FEN \"{start} w GEge - 0 1\"]\n1. O-O");
+        let pgn = format!("[Variant \"Standard\"]\n[FEN \"{C960_START} w GEge - 0 1\"]\n1. O-O");
         assert_eq!(
             board_at(&pgn, 1),
             Err(PgnError::IllegalMove("O-O".to_string()))
@@ -296,9 +306,6 @@ mod tests {
             ),
             Err(PgnError::IllegalMove("O-O-O".to_string()))
         );
-        let std = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
-        let board: Board = std.parse().expect("valid FEN");
-        assert_eq!(implied_variant(&board, "KQkq"), Variant::Standard);
     }
 
     #[test]
