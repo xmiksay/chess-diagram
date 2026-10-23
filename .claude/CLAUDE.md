@@ -69,7 +69,7 @@ Two layers behind one seam:
   nested `(...)` variations, and stops for good at a result token or at a
   tag pair after the first move (a result-less game's successor — so its
   tags are never read as this game's). `start.rs` turns the header's `FEN`
-  tag (used whatever `SetUp` says, as python-chess/lichess do; an empty one
+  tag (name matched case-insensitively, as is `Variant`'s; used whatever `SetUp` says, as python-chess/lichess do; an empty one
   means the standard start) and `Variant` tag into the starting cozy board:
   standard rules (incl. Three-check / King of the Hill, which only change
   the win condition) or Chess960 (spelling lists in `STANDARD`/`CHESS960`,

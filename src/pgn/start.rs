@@ -118,6 +118,16 @@ mod tests {
     }
 
     #[test]
+    fn fen_and_variant_tag_names_ignore_case() {
+        for name in ["Fen", "fen"] {
+            let pgn = format!("[{name} \"8/8/8/8/8/8/4P3/4K2k w - - 0 1\"]\n1. e4");
+            assert_board(&pgn, 0, "8/8/8/8/8/8/4P3/4K2k w");
+        }
+        let c960 = "[variant \"Chess960\"]\n[FEN \"4k3/8/8/8/8/8/8/5KR1 w K - 0 1\"]\n1. O-O";
+        assert_board(c960, 1, "4k3/8/8/8/8/8/8/5RK1 b");
+    }
+
+    #[test]
     fn fen_tag_sets_the_start_position() {
         let pgn = "[Event \"Puzzle\"]\n[SetUp \"1\"]\n[FEN \"6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1\"]\n\n1. Ra8# 1-0";
         assert_board(pgn, 0, "6k1/5ppp/8/8/8/8/8/R5K1 w");

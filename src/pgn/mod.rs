@@ -70,7 +70,8 @@ pub enum PgnError {
 /// FEN fields that can't change the board are read leniently: castling rights
 /// the position can't support (a blanket `KQkq` with no rooks, a non-standard
 /// king square outside Chess960) and an en passant square no pawn could
-/// capture on are dropped, not an error.
+/// capture on are dropped, not an error. The `FEN` and `Variant` tag names
+/// themselves match regardless of case (`[Fen ...]`).
 ///
 /// Only the mainline is walked: comments (`{...}`, `;`), `%` escape lines,
 /// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, and move
@@ -105,10 +106,12 @@ pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
     let mut tokens = tokens(pgn).peekable();
     let (mut fen, mut variant) = (None, None);
     while let Some(Token::Tag(tag)) = tokens.next_if(|t| matches!(t, Token::Tag(_))) {
-        match tag.name {
-            "FEN" => fen = Some(unescape(tag.value)),
-            "Variant" => variant = Some(unescape(tag.value)),
-            _ => {}
+        // The spec makes tag names case-sensitive, but a mis-cased `[Fen]`
+        // silently ignored would render the wrong board.
+        if tag.name.eq_ignore_ascii_case("FEN") {
+            fen = Some(unescape(tag.value));
+        } else if tag.name.eq_ignore_ascii_case("Variant") {
+            variant = Some(unescape(tag.value));
         }
     }
     let mut pos = start_position(fen.as_deref(), variant.as_deref())?;
