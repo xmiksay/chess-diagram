@@ -41,6 +41,7 @@ pub enum PgnError {
 /// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, move
 /// numbers, and tag pairs are skipped; a game-result token (`1-0`, `0-1`,
 /// `1/2-1/2`, `*`), or a tag pair after the first move, ends the mainline.
+/// Castling is accepted as `O-O`/`O-O-O` or zero-castling `0-0`/`0-0-0`.
 ///
 /// # Example
 ///
@@ -150,6 +151,11 @@ mod tests {
         let zero = board_at(&format!("{moves} 0-0"), 7);
         assert!(zero.is_ok());
         assert_eq!(zero, board_at(&format!("{moves} O-O"), 7));
+        // Black castling queenside, glued to its move number.
+        let moves = "1. d4 d5 2. Nc3 Nc6 3. Bf4 Bf5 4. Qd2 Qd7 5. e3";
+        let zero = board_at(&format!("{moves} 5...0-0-0"), 10);
+        assert!(zero.is_ok());
+        assert_eq!(zero, board_at(&format!("{moves} 5...O-O-O"), 10));
     }
 
     #[test]

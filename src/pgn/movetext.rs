@@ -212,6 +212,8 @@ mod tests {
     #[test]
     fn move_numbers_strip_but_zero_castling_stays_whole() {
         assert_eq!(sans("1.e4 1...e5 2 Nf3 0-0"), ["e4", "e5", "Nf3", "0-0"]);
+        // A move number glued to zero-castling strips only the number.
+        assert_eq!(sans("4.0-0 4...0-0-0"), ["0-0", "0-0-0"]);
     }
 
     #[test]
