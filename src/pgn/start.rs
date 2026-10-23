@@ -3,52 +3,46 @@
 //! move generator (castling is always "king takes own rook"), so the variant
 //! only changes which castling rights a FEN may grant.
 //!
-//! The FEN is read leniently where that can't change the board: castling
-//! rights the position can't support (puzzle generators often write a blanket
-//! `KQkq`) are dropped rather than failing the diagram, as python-chess and
-//! lichess do.
+//! The FEN is read leniently where that can't change the board, as
+//! python-chess and lichess do: unsupportable castling rights (see
+//! `castling.rs`) and an en passant square no pawn could capture on are
+//! dropped rather than failing the diagram.
 
-use cozy_chess::{Board, BoardBuilder, Color, File, Piece, Rank, Square};
+use cozy_chess::{Board, Square};
 
+use super::castling::with_castling;
 use super::PgnError;
 
-/// `Variant` tag spellings played with standard move rules (lichess writes
-/// `Standard` and `From Position`; the rest follow python-chess's aliases).
-/// Three-check and King of the Hill only change how a game is won, never
-/// which moves are legal, so their boards are walked like standard chess.
+/// `Variant` tag spellings played with standard move rules, compared ignoring
+/// case, whitespace, `-` and `_` (lichess writes `Standard` and `From Position`;
+/// the rest follow python-chess's aliases). Three-check and King of the Hill
+/// only change how a game is won, never which moves are legal, so their
+/// boards are walked like standard chess.
 const STANDARD: &[&str] = &[
-    "Standard",
-    "Chess",
-    "Normal",
-    "Classical",
-    "From Position",
-    "Three-check",
-    "Three check",
-    "Threecheck",
+    "standard",
+    "chess",
+    "normal",
+    "classical",
+    "fromposition",
+    "threecheck",
     "3check",
-    "King of the Hill",
-    "KingOfTheHill",
-    "KOTH",
+    "kingofthehill",
+    "koth",
 ];
-const CHESS960: &[&str] = &[
-    "Chess960",
-    "Chess 960",
-    "Fischerandom",
-    "Fischerrandom",
-    "Fischer Random",
-];
+const CHESS960: &[&str] = &["chess960", "fischerandom", "fischerrandom"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Variant {
+pub(super) enum Variant {
     Standard,
     Chess960,
 }
 
 /// The board a mainline starts from: `fen` (the unescaped `FEN` tag) when
 /// present, else the standard start position (also Chess960 position 518).
+/// An empty FEN tag is an exporter placeholder, like an empty `Variant`.
 pub(super) fn start_position(fen: Option<&str>, variant: Option<&str>) -> Result<Board, PgnError> {
     let variant = parse_variant(variant)?;
-    match fen {
+    match fen.filter(|f| !f.trim().is_empty()) {
         None => Ok(Board::startpos()),
         Some(fen) => parse_fen(fen, variant).ok_or_else(|| PgnError::InvalidFen(fen.to_string())),
     }
@@ -59,7 +53,12 @@ fn parse_variant(tag: Option<&str>) -> Result<Variant, PgnError> {
     let Some(tag) = tag.filter(|t| !t.trim().is_empty()) else {
         return Ok(Variant::Standard);
     };
-    let is_one_of = |names: &[&str]| names.iter().any(|n| n.eq_ignore_ascii_case(tag.trim()));
+    let key: String = tag
+        .chars()
+        .filter(|c| !(c.is_whitespace() || matches!(c, '-' | '_')))
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    let is_one_of = |names: &[&str]| names.contains(&key.as_str());
     if is_one_of(STANDARD) {
         Ok(Variant::Standard)
     } else if is_one_of(CHESS960) {
@@ -69,9 +68,7 @@ fn parse_variant(tag: Option<&str>) -> Result<Variant, PgnError> {
     }
 }
 
-/// Parses a FEN whose castling field may be X-FEN (`KQkq`, plus a rook's file
-/// letter when it isn't the outermost one) or Shredder-FEN (`HAha`): cozy's
-/// own X-FEN mode pins `K`/`Q` to the h/a files, which is wrong in Chess960.
+/// Parses a FEN, its castling field via [`with_castling`].
 fn parse_fen(fen: &str, variant: Variant) -> Option<Board> {
     let mut fields = fen.split_ascii_whitespace();
     let (placement, side, castling, en_passant) = (
@@ -95,65 +92,16 @@ fn parse_fen(fen: &str, variant: Variant) -> Option<Board> {
     if fields.next().is_some() || placement.split('/').count() != 8 {
         return None;
     }
-    let board = Board::from_fen(&format!("{placement} {side} - {en_passant} 0 1"), false).ok()?;
-
-    let mut builder = BoardBuilder::from_board(&board);
-    if castling != "-" {
-        for c in castling.chars() {
-            let letter = c.to_ascii_lowercase();
-            if !matches!(letter, 'a'..='h' | 'k' | 'q') {
-                return None;
-            }
-            let color = if c.is_ascii_uppercase() {
-                Color::White
-            } else {
-                Color::Black
-            };
-            let Some((short, file)) = castling_right(&board, color, letter, variant) else {
-                continue;
-            };
-            let rights = builder.castle_rights_mut(color);
-            let slot = if short {
-                &mut rights.short
-            } else {
-                &mut rights.long
-            };
-            // A repeated side (`KH`) keeps its first rook.
-            slot.get_or_insert(file);
-        }
-    }
-    builder.build().ok()
-}
-
-/// One castling-field letter (`k`, `q`, or a rook's file) → (is it the king
-/// side, the castling rook's file); `None` when the board can't support that
-/// right: no king on the back rank, no rook there, or — in standard chess —
-/// anything but an e-file king with an a/h-file rook.
-fn castling_right(
-    board: &Board,
-    color: Color,
-    letter: char,
-    variant: Variant,
-) -> Option<(bool, File)> {
-    let back_rank = Rank::First.relative_to(color);
-    let king = board.king(color);
-    if king.rank() != back_rank {
+    if en_passant != "-" && en_passant.parse::<Square>().is_err() {
         return None;
     }
-    let king = king.file();
-    let mut rook_files = (board.colored_pieces(color, Piece::Rook) & back_rank.bitboard())
-        .into_iter()
-        .map(Square::file);
-    let (short, file) = match letter {
-        'k' => (true, rook_files.filter(|&f| f > king).max()?),
-        'q' => (false, rook_files.filter(|&f| f < king).min()?),
-        _ => {
-            let file = File::try_from(letter).ok()?;
-            (file > king, rook_files.find(|&f| f == file)?)
-        }
-    };
-    let standard = king == File::E && file == if short { File::H } else { File::A };
-    (variant == Variant::Chess960 || standard).then_some((short, file))
+    // cozy rejects an en passant square without a capturable pawn behind it;
+    // such a square can never enable a capture, so it's dropped instead.
+    let board = Board::from_fen(&format!("{placement} {side} - {en_passant} 0 1"), false)
+        .or_else(|_| Board::from_fen(&format!("{placement} {side} - - 0 1"), false))
+        .ok()?;
+
+    with_castling(&board, castling, variant)
 }
 
 #[cfg(test)]
@@ -222,11 +170,38 @@ mod tests {
     }
 
     #[test]
-    fn setup_zero_overrides_a_fen_tag() {
-        let fen = "[FEN \"8/8/8/8/8/8/4P3/4K2k w - - 0 1\"]";
-        assert_board(&format!("[SetUp \"0\"]\n{fen}\n1. e4"), 0, START);
-        let pgn = format!("[SetUp \"1\"]\n{fen}\n1. e4");
-        assert_board(&pgn, 0, "8/8/8/8/8/8/4P3/4K2k w");
+    fn fen_tag_wins_whatever_setup_says() {
+        for setup in ["", "[SetUp \"0\"]\n", "[SetUp \"1\"]\n"] {
+            let pgn = format!("{setup}[FEN \"8/8/8/8/8/8/4P3/4K2k w - - 0 1\"]\n1. e4");
+            assert_board(&pgn, 0, "8/8/8/8/8/8/4P3/4K2k w");
+        }
+        // An empty FEN tag is a placeholder for the standard start.
+        assert_board("[SetUp \"1\"]\n[FEN \"\"]\n1. e4", 0, START);
+    }
+
+    #[test]
+    fn lenient_fen_fields_still_render() {
+        // A blanket `KQkq` puzzle FEN still renders, and still plays.
+        assert_board(
+            "[FEN \"4k3/8/8/8/8/8/8/4K2R w KQkq - 0 1\"]\n1. O-O",
+            1,
+            "4k3/8/8/8/8/8/8/5RK1 b",
+        );
+        // An en passant square no pawn can capture on is dropped...
+        assert_board(
+            "[FEN \"4k3/8/8/8/8/8/8/4K3 b - e3 0 1\"]",
+            0,
+            "4k3/8/8/8/8/8/8/4K3 b",
+        );
+        // ...but a real one still enables the capture.
+        let ep = "[FEN \"4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 1\"]\n1. exd6";
+        assert_board(ep, 1, "4k3/8/3P4/8/8/8/8/4K3 b");
+        // A malformed en passant field is still invalid.
+        let bad = "4k3/8/8/8/8/8/8/4K3 w - e9 0 1";
+        assert_eq!(
+            board_at(&format!("[FEN \"{bad}\"]"), 0),
+            Err(PgnError::InvalidFen(bad.to_string()))
+        );
     }
 
     #[test]
@@ -288,14 +263,6 @@ mod tests {
         );
     }
 
-    fn rights(fen: &str, variant: Variant) -> Option<[(Option<File>, Option<File>); 2]> {
-        let board = parse_fen(fen, variant)?;
-        Some(Color::ALL.map(|c| {
-            let r = board.castle_rights(c);
-            (r.short, r.long)
-        }))
-    }
-
     #[test]
     fn variant_tag_spellings() {
         for standard in [
@@ -307,6 +274,7 @@ mod tests {
             Some("CHESS"),
             Some("Three-check"),
             Some("king of the hill"),
+            Some("King-of-the-Hill"),
         ] {
             assert_eq!(parse_variant(standard), Ok(Variant::Standard));
         }
@@ -316,72 +284,6 @@ mod tests {
         assert_eq!(
             parse_variant(Some("Crazyhouse")),
             Err(PgnError::UnsupportedVariant("Crazyhouse".to_string()))
-        );
-    }
-
-    #[test]
-    fn xfen_letters_pick_the_outermost_rook() {
-        // King b1 between rooks a1 and g1/h1; `K` is the h-rook, `G` the g-rook.
-        let fen = "r4k1r/8/8/8/8/8/8/RK4RR w KQk - 0 1";
-        let h_and_a = Some([(Some(File::H), Some(File::A)), (Some(File::H), None)]);
-        assert_eq!(rights(fen, Variant::Chess960), h_and_a);
-        assert_eq!(
-            rights("r4k1r/8/8/8/8/8/8/RK4RR w HAh - 0 1", Variant::Chess960),
-            h_and_a
-        );
-        assert_eq!(
-            rights("r4k1r/8/8/8/8/8/8/RK4RR w GAh - 0 1", Variant::Chess960),
-            Some([(Some(File::G), Some(File::A)), (Some(File::H), None)])
-        );
-    }
-
-    #[test]
-    fn unsupportable_castling_rights_are_dropped() {
-        let none = Some([(None, None), (None, None)]);
-        for fen in [
-            "4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1", // blanket rights, no rooks
-            "4k3/8/8/8/8/8/8/R3K2R w E - 0 1",  // the king's own file
-            "4k3/8/8/8/8/8/8/R3K2R w C - 0 1",  // no rook on that file
-            "4k3/8/8/8/8/8/4K3/R6R w KQ - 0 1", // king off the back rank
-        ] {
-            assert_eq!(rights(fen, Variant::Chess960), none, "{fen}");
-        }
-        // A repeated side keeps its first rook; the other rights survive.
-        assert_eq!(
-            rights("4k3/8/8/8/8/8/8/R3K1RR w GHQ - 0 1", Variant::Chess960),
-            Some([(Some(File::G), Some(File::A)), (None, None)])
-        );
-        // A blanket `KQkq` puzzle FEN still renders, and still plays.
-        assert_board(
-            "[FEN \"4k3/8/8/8/8/8/8/4K2R w KQkq - 0 1\"]\n1. O-O",
-            1,
-            "4k3/8/8/8/8/8/8/5RK1 b",
-        );
-    }
-
-    #[test]
-    fn malformed_castling_field_is_invalid() {
-        for fen in [
-            "4k3/8/8/8/8/8/8/R3K2R w X - 0 1",
-            "4k3/8/8/8/8/8/8/R3K2R w K1 - 0 1",
-        ] {
-            assert_eq!(rights(fen, Variant::Chess960), None, "{fen}");
-        }
-    }
-
-    #[test]
-    fn standard_variant_only_castles_from_the_standard_squares() {
-        let fen960 = "r4k1r/8/8/8/8/8/8/RK4RR w KQk - 0 1";
-        assert_eq!(
-            rights(fen960, Variant::Standard),
-            Some([(None, None), (None, None)])
-        );
-        assert_eq!(
-            rights("r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1", Variant::Standard),
-            Some([
-                (Some(File::H), Some(File::A)),
-                (Some(File::H), Some(File::A))
-            ])
         );
     }
 

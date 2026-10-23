@@ -5,6 +5,7 @@
 //! [`Board`]. Never touches the default (`FenError`-only) parse layer
 //! contract — errors here are [`PgnError`], a separate type.
 
+mod castling;
 mod convert;
 mod movetext;
 mod san;
@@ -51,22 +52,25 @@ pub enum PgnError {
 /// `1` = after the first move, …) and returns the resulting [`Board`].
 ///
 /// The walk starts from the position in the game's `FEN` header tag when
-/// there is one (with or without `[SetUp "1"]`, which many exporters omit;
-/// an explicit `[SetUp "0"]` overrides it), otherwise from the standard start
-/// position. `ply` counts from that
-/// position, and the side to move follows the FEN's, so a FEN with Black to
-/// move takes Black's move (`1... e5`) as ply 1. Only the header section
-/// before the first move is read.
+/// there is one, whatever `SetUp` says (many exporters omit it), otherwise —
+/// or when the tag is empty — from the standard start position. `ply` counts
+/// from that position, and the side to move follows the FEN's, so a FEN with
+/// Black to move takes Black's move (`1... e5`) as ply 1. Only the header
+/// section before the first move is read.
 ///
 /// The `Variant` tag selects the rules: absent, empty, standard chess
 /// (`Standard`, `From Position`, …) or a variant with standard move rules
 /// (`Three-check`, `King of the Hill`) plays standard chess; Chess960
-/// (`Chess960`, `Chess 960`, `Fischerandom`, …, case-insensitive) accepts a
-/// FEN with X-FEN (`KQkq`, outermost rook) or Shredder-FEN (`HAha`) castling
-/// rights and resolves `O-O`/`O-O-O` by rook side, and starts from the
-/// standard position (Chess960 position 518) without a `FEN` tag. Castling
-/// rights the position can't support (a blanket `KQkq` with no rooks, a
-/// non-standard king square outside Chess960) are dropped, not an error.
+/// (`Chess960`, `Chess 960`, `Fischerandom`, …) accepts X-FEN (`KQkq`,
+/// outermost rook) or Shredder-FEN (`HAha`) castling rights and resolves
+/// `O-O`/`O-O-O` by rook side. Names compare ignoring case, whitespace, `-`
+/// and `_`. Without a `FEN` tag Chess960 starts from the standard position
+/// (Chess960 position 518).
+///
+/// FEN fields that can't change the board are read leniently: castling rights
+/// the position can't support (a blanket `KQkq` with no rooks, a non-standard
+/// king square outside Chess960) and an en passant square no pawn could
+/// capture on are dropped, not an error.
 ///
 /// Only the mainline is walked: comments (`{...}`, `;`), `%` escape lines,
 /// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, and move
@@ -99,21 +103,13 @@ pub enum PgnError {
 /// ```
 pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
     let mut tokens = tokens(pgn).peekable();
-    let (mut fen, mut variant, mut setup) = (None, None, None);
+    let (mut fen, mut variant) = (None, None);
     while let Some(Token::Tag(tag)) = tokens.next_if(|t| matches!(t, Token::Tag(_))) {
         match tag.name {
             "FEN" => fen = Some(unescape(tag.value)),
             "Variant" => variant = Some(unescape(tag.value)),
-            "SetUp" => setup = Some(unescape(tag.value)),
             _ => {}
         }
-    }
-    // `SetUp "0"` explicitly declares the standard start; a FEN tag beside it
-    // is stale. Absent `SetUp` doesn't count: many exporters omit it. An empty
-    // FEN tag is an exporter placeholder, like an empty `Variant`.
-    let empty_fen = fen.as_deref().is_some_and(|f| f.trim().is_empty());
-    if empty_fen || setup.as_deref().map(str::trim) == Some("0") {
-        fen = None;
     }
     let mut pos = start_position(fen.as_deref(), variant.as_deref())?;
 
@@ -171,13 +167,6 @@ mod tests {
             })
         );
         assert_eq!(board.side_to_move, Color::Black);
-    }
-
-    #[test]
-    fn empty_fen_tag_means_the_standard_start() {
-        let pgn = "[SetUp \"1\"]\n[FEN \"\"]\n1. e4 e5";
-        assert_eq!(board_at(pgn, 2), board_at("1. e4 e5", 2));
-        assert!(board_at(pgn, 2).is_ok());
     }
 
     #[test]

@@ -69,21 +69,23 @@ Two layers behind one seam:
   nested `(...)` variations, and stops for good at a result token or at a
   tag pair after the first move (a result-less game's successor — so its
   tags are never read as this game's). `start.rs` turns the header's `FEN`
-  tag (`SetUp` not required; an explicit `SetUp "0"` discards it) and
-  `Variant` tag into the starting cozy board: standard rules (incl.
-  Three-check / King of the Hill, which only change the win condition) or
-  Chess960 (spelling lists in `STANDARD`/`CHESS960`), anything else
-  `UnsupportedVariant`. Its FEN parse rewrites the castling field itself —
+  tag (used whatever `SetUp` says, as python-chess/lichess do; an empty one
+  means the standard start) and `Variant` tag into the starting cozy board:
+  standard rules (incl. Three-check / King of the Hill, which only change
+  the win condition) or Chess960 (spelling lists in `STANDARD`/`CHESS960`,
+  matched ignoring case, whitespace, `-` and `_`), anything else
+  `UnsupportedVariant`. FEN fields that can't change the board are read
+  leniently: clocks are optional and only checked to be numbers (cozy caps
+  the halfmove clock at 100), a Three-check checks-remaining field (`3+3` /
+  lichess `+0+0`) is ignored, and an en passant square no pawn could
+  capture on is dropped (cozy rejects it); the placement must have 8 ranks
+  (cozy accepts fewer). `castling.rs` applies the castling field itself —
   cozy's X-FEN mode pins `K`/`Q` to the h/a files, wrong in Chess960 —
   accepting X-FEN (`K`/`Q` = outermost rook, or a file letter) and
-  Shredder-FEN. A right the board can't support (no back-rank king/rook,
+  Shredder-FEN; a right the board can't support (no back-rank king/rook,
   or outside Chess960 anything but an e-file king with an a/h rook) is
-  dropped, not an error — puzzle generators write blanket `KQkq`; a
-  malformed castling field is still invalid. Clocks are optional and only
-  checked to be numbers (cozy caps the halfmove clock at 100), a
-  Three-check checks-remaining field (`3+3` / lichess `+0+0`) is ignored, and the
-  placement must have 8 ranks (cozy accepts fewer). A FEN that doesn't
-  parse is `InvalidFen`. `ply` counts from that position. Errors are
+  dropped, not an error, since puzzle generators write blanket `KQkq`. A
+  malformed field or a FEN that doesn't parse is `InvalidFen`. `ply` counts from that position. Errors are
   `PgnError` (`#[non_exhaustive]`), a type separate from `FenError` — this
   module never touches the parse layer or its error contract.
 - **PNG layer** — `src/png.rs` (`#[cfg(feature = "png")]`, opt-in, implies
