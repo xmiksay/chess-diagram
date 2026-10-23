@@ -1,9 +1,9 @@
 [package]
 name = "chess-diagram"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 license = "MIT"
-description = "Render a chess position (FEN) to a self-contained SVG diagram with Cburnett pieces, coordinate labels, highlight/check squares, and study-style arrow/circle/text annotations. Pure Rust, no native deps."
+description = "Render a chess position (FEN) to a self-contained SVG diagram with Cburnett pieces, coordinate labels, highlight/check squares, study-style arrow/circle/text annotations, and opt-in PGN (position at move N, FEN/Chess960 starts) and PNG output. Pure Rust, no native deps."
 repository = "https://github.com/xmiksay/chess-diagram"
 readme = "README.md"
 keywords = ["chess", "fen", "svg", "diagram", "arrows"]

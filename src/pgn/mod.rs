@@ -5,19 +5,33 @@
 //! [`Board`]. Never touches the default (`FenError`-only) parse layer
 //! contract — errors here are [`PgnError`], a separate type.
 
+mod castling;
+mod convert;
 mod movetext;
 mod san;
+mod start;
 
 use thiserror::Error;
 
-use crate::board::{Board, Color, Piece, Role};
-use movetext::mainline_sans;
+use crate::board::Board;
+use convert::convert_board;
+use movetext::{tokens, unescape, Token};
 use san::San;
+use start::start_position;
 
 /// Errors from walking a PGN movetext. Kept separate from [`FenError`](crate::FenError)
 /// so the default build's error surface is unaffected by this feature.
 #[derive(Debug, Error, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum PgnError {
+    /// The `FEN` header tag (carried here, unescaped) isn't a valid position
+    /// for the game's variant.
+    #[error("invalid FEN tag {0:?}")]
+    InvalidFen(String),
+    /// The `Variant` header tag (carried here, unescaped) names a variant
+    /// whose move rules differ from standard chess and Chess960.
+    #[error("unsupported variant {0:?}")]
+    UnsupportedVariant(String),
     /// `ply` asked for more half-moves than the mainline contains.
     #[error("PGN mainline has {available} ply, requested ply {requested}")]
     PlyOutOfRange {
@@ -35,27 +49,73 @@ pub enum PgnError {
 }
 
 /// Walks `pgn`'s mainline to half-move `ply` (`0` = the starting position,
-/// `1` = after White's first move, …) and returns the resulting [`Board`].
+/// `1` = after the first move, …) and returns the resulting [`Board`].
+///
+/// The walk starts from the position in the game's `FEN` header tag when
+/// there is one, whatever `SetUp` says (many exporters omit it), otherwise —
+/// or when the tag is empty — from the standard start position. `ply` counts
+/// from that position, and the side to move follows the FEN's, so a FEN with
+/// Black to move takes Black's move (`1... e5`) as ply 1. Only the header
+/// section before the first move is read.
+///
+/// The `Variant` tag selects the rules: absent, empty, standard chess
+/// (`Standard`, `From Position`, …) or a variant with standard move rules
+/// (`Three-check`, `King of the Hill`) plays standard chess; Chess960
+/// (`Chess960`, `Chess 960`, `Fischerandom`, …) accepts X-FEN (`KQkq`,
+/// outermost rook) or Shredder-FEN (`HAha`) castling rights and resolves
+/// `O-O`/`O-O-O` by rook side. Names compare ignoring case, whitespace, `-`
+/// and `_`. Without a `FEN` tag Chess960 starts from the standard position
+/// (Chess960 position 518).
+///
+/// FEN fields that can't change the board are read leniently: castling rights
+/// the position can't support (a blanket `KQkq` with no rooks, a non-standard
+/// king square outside Chess960) and an en passant square no pawn could
+/// capture on are dropped, not an error.
 ///
 /// Only the mainline is walked: comments (`{...}`, `;`), `%` escape lines,
-/// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, move
-/// numbers, and tag pairs are skipped; a game-result token (`1-0`, `0-1`,
-/// `1/2-1/2`, `*`), or a tag pair after the first move, ends the mainline.
-/// Castling is accepted as `O-O`/`O-O-O` or zero-castling `0-0`/`0-0-0`.
+/// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, and move
+/// numbers are skipped; a game-result token (`1-0`, `0-1`, `1/2-1/2`, `*`),
+/// or a tag pair after the first move, ends the mainline. Castling is
+/// accepted as `O-O`/`O-O-O` or zero-castling `0-0`/`0-0-0`.
+///
+/// # Errors
+///
+/// [`PgnError::UnsupportedVariant`] for any other `Variant`;
+/// [`PgnError::InvalidFen`] when the `FEN` tag doesn't parse;
+/// [`PgnError::InvalidSan`] /
+/// [`PgnError::IllegalMove`] for a bad mainline move; and
+/// [`PgnError::PlyOutOfRange`] when the mainline is shorter than `ply`.
 ///
 /// # Example
 ///
 /// ```
 /// use chess_diagram::pgn::board_at;
+/// use chess_diagram::Square;
 ///
 /// let board = board_at("1. e4 e5 2. Nf3", 3)?;
-/// assert!(board.piece_at(chess_diagram::Square::from_algebraic("f3").unwrap()).is_some());
+/// assert!(board.piece_at(Square::from_algebraic("f3").unwrap()).is_some());
+///
+/// // A `FEN` tag sets the starting position.
+/// let endgame = "[FEN \"8/8/8/8/8/8/4P3/4K2k w - - 0 1\"]\n\n1. e4 *";
+/// let board = board_at(endgame, 1)?;
+/// assert!(board.piece_at(Square::from_algebraic("d1").unwrap()).is_none());
 /// # Ok::<(), chess_diagram::pgn::PgnError>(())
 /// ```
 pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
-    let mut pos = cozy_chess::Board::startpos();
+    let mut tokens = tokens(pgn).peekable();
+    let (mut fen, mut variant) = (None, None);
+    while let Some(Token::Tag(tag)) = tokens.next_if(|t| matches!(t, Token::Tag(_))) {
+        match tag.name {
+            "FEN" => fen = Some(unescape(tag.value)),
+            "Variant" => variant = Some(unescape(tag.value)),
+            _ => {}
+        }
+    }
+    let mut pos = start_position(fen.as_deref(), variant.as_deref())?;
+
     let mut played = 0;
-    for token in mainline_sans(pgn).take(ply) {
+    // Only SAN tokens follow the header: a later tag pair ends the lexer.
+    for token in tokens.filter_map(Token::san).take(ply) {
         let san = San::parse(token).ok_or_else(|| PgnError::InvalidSan(token.to_string()))?;
         let mv = san
             .to_move(&pos)
@@ -78,46 +138,10 @@ pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
     Ok(convert_board(&pos))
 }
 
-fn convert_board(pos: &cozy_chess::Board) -> Board {
-    let mut squares = [None; 64];
-    // Both models index squares rank-major from a1, so the orders line up.
-    for (slot, sq) in squares.iter_mut().zip(cozy_chess::Square::ALL) {
-        *slot = pos
-            .piece_on(sq)
-            .zip(pos.color_on(sq))
-            .map(|(role, color)| Piece {
-                color: convert_color(color),
-                role: convert_role(role),
-            });
-    }
-    Board {
-        squares,
-        side_to_move: convert_color(pos.side_to_move()),
-    }
-}
-
-fn convert_color(color: cozy_chess::Color) -> Color {
-    match color {
-        cozy_chess::Color::White => Color::White,
-        cozy_chess::Color::Black => Color::Black,
-    }
-}
-
-fn convert_role(role: cozy_chess::Piece) -> Role {
-    match role {
-        cozy_chess::Piece::Pawn => Role::Pawn,
-        cozy_chess::Piece::Knight => Role::Knight,
-        cozy_chess::Piece::Bishop => Role::Bishop,
-        cozy_chess::Piece::Rook => Role::Rook,
-        cozy_chess::Piece::Queen => Role::Queen,
-        cozy_chess::Piece::King => Role::King,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::board::Square;
+    use crate::board::{Color, Piece, Role, Square};
 
     #[test]
     fn ply_zero_is_start_position() {

@@ -198,6 +198,14 @@ loading — those belong to the consumers.
   assert!(board.piece_at(chess_diagram::Square::from_algebraic("b5").unwrap()).is_some());
   ```
 
+  A `FEN` header tag (puzzles, endgames — `SetUp` is optional) sets the
+  position the walk starts from, and `ply` counts from there. A `Variant` tag
+  of standard chess or Chess960 is honoured (Chess960 FENs may use X-FEN
+  `KQkq` or Shredder-FEN `HAha` castling rights), and Three-check / King of
+  the Hill play by standard move rules; any other variant is
+  `PgnError::UnsupportedVariant`, and a FEN tag that doesn't parse is
+  `PgnError::InvalidFen`.
+
   With `features = ["png"]` — coordinate labels and text badges use
   `sans-serif`, so this loads the host's system fonts via `fontdb`; exact
   pixel output is environment-dependent, but dimensions and PNG validity

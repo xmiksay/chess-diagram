@@ -1,15 +1,60 @@
-//! PGN text → the mainline's SAN tokens. A character-level lexer rather than a
-//! word/line splitter, because PGN's delimiters are self-terminating: a
-//! comment may be glued to a move (`e4{best}`), span lines that start with
-//! `[` (`{ ...\n[%clk 0:03:00] }`), or contain `)`, `{` and `;` literally.
+//! PGN text → header tag pairs and the mainline's SAN tokens. A
+//! character-level lexer rather than a word/line splitter, because PGN's
+//! delimiters are self-terminating: a comment may be glued to a move
+//! (`e4{best}`), span lines that start with `[` (`{ ...\n[%clk 0:03:00] }`),
+//! or contain `)`, `{` and `;` literally.
 
-/// Yields SAN move tokens from a PGN's mainline, skipping tag pairs, move
-/// numbers, `{...}` and `;` comments, `%` escape lines, variations, NAGs, and
-/// `!`/`?` suffix annotations. A game-result token (`1-0`, `0-1`, `1/2-1/2`,
-/// `*`) ends the mainline, and so does a tag pair once moves have started (a
-/// result-less game followed by the next game's headers), so a second
-/// concatenated game is never played onto the first one's board.
-pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
+use std::borrow::Cow;
+
+/// One lexed PGN token: a header tag pair or a mainline SAN move.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Token<'a> {
+    Tag(Tag<'a>),
+    San(&'a str),
+}
+
+impl<'a> Token<'a> {
+    pub(super) fn san(self) -> Option<&'a str> {
+        match self {
+            Token::San(san) => Some(san),
+            Token::Tag(_) => None,
+        }
+    }
+}
+
+/// A `[Name "value"]` header tag pair. `value` is still escaped (see
+/// [`unescape`]); a malformed tag keeps whatever followed its opening quote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Tag<'a> {
+    pub(super) name: &'a str,
+    pub(super) value: &'a str,
+}
+
+/// Resolves a tag value's `\"` and `\\` escapes, borrowing when it has none.
+/// Those are PGN's only escapes, so any other backslash stays literal.
+pub(super) fn unescape(value: &str) -> Cow<'_, str> {
+    if !value.contains('\\') {
+        return Cow::Borrowed(value);
+    }
+    let mut out = String::with_capacity(value.len());
+    let mut chars = value.chars().peekable();
+    while let Some(c) = chars.next() {
+        let escaped = (c == '\\')
+            .then(|| chars.next_if(|&n| n == '"' || n == '\\'))
+            .flatten();
+        out.push(escaped.unwrap_or(c));
+    }
+    Cow::Owned(out)
+}
+
+/// Yields a PGN's header tag pairs, then its mainline's SAN move tokens,
+/// skipping move numbers, `{...}` and `;` comments, `%` escape lines,
+/// variations, NAGs, and `!`/`?` suffix annotations. A game-result token
+/// (`1-0`, `0-1`, `1/2-1/2`, `*`) ends the mainline, and so does a tag pair
+/// once moves have started (a result-less game followed by the next game's
+/// headers), so a second concatenated game is never played onto the first
+/// one's board — nor are its tags read as the first one's.
+pub(super) fn tokens(pgn: &str) -> impl Iterator<Item = Token<'_>> {
     // Editors on Windows prepend a BOM, which isn't whitespace to `trim_start`.
     let pgn = pgn.strip_prefix('\u{feff}').unwrap_or(pgn);
     let mut rest = pgn;
@@ -40,7 +85,11 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
                 rest = "";
                 return None;
             }
-            '[' if variation_depth == 0 => skip_tag(after),
+            '[' if variation_depth == 0 => {
+                let (tag, tail) = tag(after);
+                rest = tail;
+                return Some(Token::Tag(tag));
+            }
             '(' => {
                 variation_depth = variation_depth.saturating_add(1);
                 after
@@ -81,7 +130,7 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
                     continue;
                 }
                 in_movetext = true;
-                return Some(san);
+                return Some(Token::San(san));
             }
         };
     })
@@ -96,22 +145,40 @@ fn skip_line(s: &str) -> &str {
     s.split_once('\n').map_or("", |(_, tail)| tail)
 }
 
-/// Skips a `[Name "value"]` tag pair (after its `[`): up to the `]` outside
+/// Lexes a `[Name "value"]` tag pair (after its `[`) up to the `]` outside
 /// the quoted value, or the end of the line if the tag is malformed.
-fn skip_tag(s: &str) -> &str {
-    let mut in_string = false;
+fn tag(s: &str) -> (Tag<'_>, &str) {
+    // Byte offsets of the first two unescaped quotes: the value's delimiters.
+    let mut quotes = [None, None];
+    let mut quote_count = 0usize;
     let mut escaped = false;
-    for (i, c) in s.char_indices() {
-        match c {
-            _ if escaped => escaped = false,
-            '\\' if in_string => escaped = true,
-            '"' => in_string = !in_string,
-            ']' if !in_string => return s.get(i + 1..).unwrap_or(""),
-            '\n' => return s.get(i..).unwrap_or(""),
-            _ => {}
+    let (end, rest) = 'scan: {
+        for (i, c) in s.char_indices() {
+            let in_string = quote_count % 2 == 1;
+            match c {
+                // Even escaped, a newline ends the tag: a stray trailing `\`
+                // must not swallow the next tag pair.
+                '\n' => break 'scan (i, s.get(i..).unwrap_or("")),
+                _ if escaped => escaped = false,
+                '\\' if in_string => escaped = true,
+                '"' => {
+                    if let Some(slot) = quotes.get_mut(quote_count) {
+                        *slot = Some(i);
+                    }
+                    quote_count += 1;
+                }
+                ']' if !in_string => break 'scan (i, s.get(i + 1..).unwrap_or("")),
+                _ => {}
+            }
         }
-    }
-    ""
+        (s.len(), "")
+    };
+    let [open, close] = quotes;
+    let name = s.get(..open.unwrap_or(end)).unwrap_or("").trim();
+    let value = open
+        .and_then(|open| s.get(open + 1..close.unwrap_or(end)))
+        .unwrap_or("");
+    (Tag { name, value }, rest)
 }
 
 #[cfg(test)]
@@ -119,7 +186,47 @@ mod tests {
     use super::*;
 
     fn sans(pgn: &str) -> Vec<&str> {
-        mainline_sans(pgn).collect()
+        tokens(pgn).filter_map(Token::san).collect()
+    }
+
+    fn tags(pgn: &str) -> Vec<(&str, &str)> {
+        tokens(pgn)
+            .filter_map(|t| match t {
+                Token::Tag(tag) => Some((tag.name, tag.value)),
+                Token::San(_) => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn tag_pairs_yield_name_and_raw_value() {
+        assert_eq!(
+            tags(
+                r#"[Event "a ] b"]
+[Site"x\"y\\"]  [ FEN  "8/8 w" ]
+1. e4 [After "x"]"#
+            ),
+            [("Event", "a ] b"), ("Site", r#"x\"y\\"#), ("FEN", "8/8 w")]
+        );
+        // Malformed tags keep what they can, up to the end of their line.
+        assert_eq!(
+            tags("[FEN \"8/8 w\n[SetUp]\n[Event \"x\" junk]"),
+            [("FEN", "8/8 w"), ("SetUp", ""), ("Event", "x")]
+        );
+        // A trailing backslash escapes nothing across the line break.
+        assert_eq!(
+            tags("[Site \"C:\\\n[FEN \"8/8 w\"]"),
+            [("Site", "C:\\"), ("FEN", "8/8 w")]
+        );
+    }
+
+    #[test]
+    fn unescape_resolves_quote_and_backslash() {
+        assert!(matches!(unescape("plain"), Cow::Borrowed("plain")));
+        assert_eq!(unescape(r#"x\"y\\z"#), r#"x"y\z"#);
+        assert_eq!(unescape("trailing\\"), "trailing\\");
+        // Only `\"` and `\\` are escapes; another backslash is literal.
+        assert_eq!(unescape(r"C:\new\\x"), r"C:\new\x");
     }
 
     #[test]
@@ -148,8 +255,8 @@ mod tests {
 
     #[test]
     fn stays_ended_after_result() {
-        let mut it = mainline_sans("1. e4 1-0 2. d4");
-        assert_eq!(it.next(), Some("e4"));
+        let mut it = tokens("1. e4 1-0 2. d4");
+        assert_eq!(it.next(), Some(Token::San("e4")));
         assert_eq!(it.next(), None);
         assert_eq!(it.next(), None);
     }
