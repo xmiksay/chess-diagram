@@ -147,11 +147,9 @@ mod tests {
     #[test]
     fn zero_castling_matches_letter_castling() {
         let moves = "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4.";
-        assert_eq!(
-            board_at(&format!("{moves} 0-0"), 7),
-            board_at(&format!("{moves} O-O"), 7)
-        );
-        assert!(board_at(&format!("{moves} 0-0"), 7).is_ok());
+        let zero = board_at(&format!("{moves} 0-0"), 7);
+        assert!(zero.is_ok());
+        assert_eq!(zero, board_at(&format!("{moves} O-O"), 7));
     }
 
     #[test]

@@ -51,8 +51,8 @@ Two layers behind one seam:
   grammar deliberately mirrors shakmaty 0.30's `San::from_ascii` (the
   previous, GPL backend) so the swap changed no accepted input or error
   kind; since then it also accepts zero-castling `0-0`/`0-0-0` (digit and
-  letter forms don't mix) — and resolves a SAN to the unique matching move from cozy-chess's
-  legal move generator (disambiguation, capture marker, promotion must all
+  letter forms don't mix) — and resolves a SAN to the unique matching move
+  from cozy-chess's legal move generator (disambiguation, capture marker, promotion must all
   match; an ambiguous SAN is `IllegalMove`). cozy-chess encodes castling as
   the king capturing its own rook, so `O-O`/`O-O-O` match that king move and
   a plain `K` SAN never does. `movetext.rs`'s `mainline_sans` is a
@@ -108,6 +108,7 @@ Extension seams:
 | 3 | `pgn` feature: `pgn::board_at` (FEN-at-move-N, originally via `shakmaty`), `PgnError`, feature-matrix CI job | done |
 | 3 | `png` feature: `png::render_png` (SVG → PNG bytes via `resvg`, `src/png.rs`), `PngError`, system-fontdb text | done |
 | 3 | Theme presets: `Theme::brown()`/`blue()`/`green()` (plain constructors, `Theme` stays hand-constructible) | done |
+| 3 | `pgn` SAN: zero-castling `0-0`/`0-0-0` accepted alongside `O-O`/`O-O-O` (forms don't mix) | done |
 | 4 | `pgn` backend swap: GPL `shakmaty` → MIT `cozy-chess` + own SAN parser (`src/pgn/san.rs`), same API (0.2.1) | done |
 
 ## Build & test
