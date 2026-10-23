@@ -70,7 +70,7 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
                     return None;
                 }
                 // Strip a move number (`12.`, `12...`, bare `12`) but not the
-                // digits of a non-SAN token like `0-0`, so its error names it whole.
+                // leading digit of zero-castling (`0-0`).
                 let unnumbered = symbol.trim_start_matches(|c: char| c.is_ascii_digit());
                 let san = if unnumbered.is_empty() || unnumbered.starts_with('.') {
                     unnumbered.trim_start_matches('.')

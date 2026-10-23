@@ -1,8 +1,8 @@
 //! SAN tokens → legal `cozy_chess` moves. The accepted grammar mirrors
-//! shakmaty 0.30's `San::from_ascii` (the previous backend) so swapping the
-//! move generator doesn't change which SAN tokens [`board_at`](super::board_at)
-//! accepts or which error it reports for them. (Movetext-level changes — what
-//! counts as a token — live in `movetext.rs`.)
+//! shakmaty 0.30's `San::from_ascii` (the previous backend) — so swapping the
+//! move generator didn't change which SAN tokens [`board_at`](super::board_at)
+//! accepts or which error it reports for them — plus zero-castling (`0-0`).
+//! (Movetext-level changes — what counts as a token — live in `movetext.rs`.)
 
 use cozy_chess::{BitBoard, Board, File, Move, Piece, Rank, Square};
 
@@ -133,15 +133,17 @@ impl Reader<'_> {
 
     fn san(&mut self) -> Option<San> {
         let role = match self.peek()? {
-            b'O' => {
+            // Zero-castling (`0-0`) is common in hand-typed PGN; the letter
+            // and digit forms don't mix (`O-0` stays invalid).
+            castle @ (b'O' | b'0') => {
                 self.next();
-                if !self.eat(b'-') || !self.eat(b'O') {
+                if !self.eat(b'-') || !self.eat(castle) {
                     return None;
                 }
                 if !self.eat(b'-') {
                     return Some(San::Castle { king_side: true });
                 }
-                return self.eat(b'O').then_some(San::Castle { king_side: false });
+                return self.eat(castle).then_some(San::Castle { king_side: false });
             }
             b'-' => {
                 self.next();
@@ -216,16 +218,16 @@ mod tests {
     const START: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
     #[test]
-    fn parses_shakmaty_grammar() {
+    fn parses_san_grammar() {
         for ok in [
             "e4", "Pe4", "exd5", "xd5", "Nf3", "Nbd7", "N1f3", "Qh4e1", "Qh4xe1", "e8=Q", "e8=q",
-            "exf8=N+", "O-O", "O-O-O#", "--", "Z0", "N@f3", "Kd1#",
+            "exf8=N+", "O-O", "O-O-O#", "0-0", "0-0-0+", "--", "Z0", "N@f3", "Kd1#",
         ] {
             assert!(San::parse(ok).is_some(), "{ok} should parse");
         }
         for bad in [
-            "", "e", "Nf", "e9", "i4", "0-0", "O-O-", "e4!", "e4+#", "e8Q", "e8=X", "nf3", "-",
-            "Z", "N@", "Nf3 ",
+            "", "e", "Nf", "e9", "i4", "O-0", "0-O", "0-0-", "00", "O-O-", "e4!", "e4+#", "e8Q",
+            "e8=X", "nf3", "-", "Z", "N@", "Nf3 ",
         ] {
             assert!(San::parse(bad).is_none(), "{bad} should not parse");
         }
@@ -236,6 +238,8 @@ mod tests {
         let fen = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
         assert_eq!(resolve(fen, "O-O").as_deref(), Some("e1h1"));
         assert_eq!(resolve(fen, "O-O-O").as_deref(), Some("e1a1"));
+        assert_eq!(resolve(fen, "0-0").as_deref(), Some("e1h1"));
+        assert_eq!(resolve(fen, "0-0-0#").as_deref(), Some("e1a1"));
         // The king stepping onto its own rook is castling, never a plain king move.
         assert_eq!(resolve(fen, "Kh1"), None);
         assert_eq!(resolve(fen, "Kf1").as_deref(), Some("e1f1"));

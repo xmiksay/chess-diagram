@@ -145,6 +145,16 @@ mod tests {
     }
 
     #[test]
+    fn zero_castling_matches_letter_castling() {
+        let moves = "1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4.";
+        assert_eq!(
+            board_at(&format!("{moves} 0-0"), 7),
+            board_at(&format!("{moves} O-O"), 7)
+        );
+        assert!(board_at(&format!("{moves} 0-0"), 7).is_ok());
+    }
+
+    #[test]
     fn castling_kingside() {
         // 1.e4 e5 2.Nf3 Nc6 3.Bc4 Bc5 4.O-O -- White castles kingside.
         let board = board_at("1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. O-O", 7).expect("valid PGN");

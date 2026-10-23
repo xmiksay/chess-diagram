@@ -50,7 +50,8 @@ Two layers behind one seam:
   `Color`/`Piece` into this crate's model. `san.rs` is our own SAN parser —
   grammar deliberately mirrors shakmaty 0.30's `San::from_ascii` (the
   previous, GPL backend) so the swap changed no accepted input or error
-  kind — and resolves a SAN to the unique matching move from cozy-chess's
+  kind; since then it also accepts zero-castling `0-0`/`0-0-0` (digit and
+  letter forms don't mix) — and resolves a SAN to the unique matching move from cozy-chess's
   legal move generator (disambiguation, capture marker, promotion must all
   match; an ambiguous SAN is `IllegalMove`). cozy-chess encodes castling as
   the king capturing its own rook, so `O-O`/`O-O-O` match that king move and
