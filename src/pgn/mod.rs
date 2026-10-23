@@ -39,8 +39,8 @@ use start::start_position;
 /// `O-O`/`O-O-O` by rook side. Names compare ignoring case, whitespace, `-`
 /// and `_`. Without a `FEN` tag Chess960 starts from the standard position
 /// (Chess960 position 518). Without a `Variant` tag, a FEN whose castling
-/// rights can only be Chess960 (Shredder `GEge`, a king off the e-file) is
-/// read as Chess960.
+/// rights all fit Chess960 and some fit only it (Shredder `GEge`, `KQkq`
+/// around a king off the e-file) is read as Chess960.
 ///
 /// FEN fields that can't change the board are read leniently: castling rights
 /// the position can't support (a blanket `KQkq` with no rooks, a non-standard

@@ -287,6 +287,15 @@ mod tests {
             0,
             "4k3/8/8/8/8/8/8/4K3 w",
         );
+        // A blanket `KQkq` after standard castling stays standard: `Q` alone
+        // would fit a Chess960 f-rook, but `K` fits nothing.
+        assert_eq!(
+            board_at(
+                "[FEN \"6k1/5ppp/8/8/8/8/5PPP/5RK1 w KQkq - 0 1\"]\n1. O-O-O",
+                1
+            ),
+            Err(PgnError::IllegalMove("O-O-O".to_string()))
+        );
         let std = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
         let board: Board = std.parse().expect("valid FEN");
         assert_eq!(implied_variant(&board, "KQkq"), Variant::Standard);

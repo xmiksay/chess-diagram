@@ -88,9 +88,11 @@ Two layers behind one seam:
   Shredder-FEN; a right the board can't support (no back-rank king/rook,
   or outside Chess960 anything but an e-file king with an a/h rook) is
   dropped, not an error, since puzzle generators write blanket `KQkq`.
-  Without a `Variant` tag, `implied_variant` picks Chess960 when a right is
-  supportable only there (king off e, rook off a/h) — safe because rights
-  that fit standard chess resolve identically under both rule sets. A
+  Without a `Variant` tag, `implied_variant` picks Chess960 when every right
+  is supportable there and some only there (king off e, rook off a/h) —
+  standard-fitting rights resolve identically under both rule sets, and
+  requiring *every* letter to fit keeps a blanket `KQkq` on a castled
+  standard board (`5RK1`, where `K` fits nothing) standard. A
   malformed field or a FEN that doesn't parse is `InvalidFen`. `ply` counts from that position. Errors are
   `PgnError` (`error.rs`, `#[non_exhaustive]`), a type separate from `FenError` — this
   module never touches the parse layer or its error contract.
@@ -140,6 +142,7 @@ Extension seams:
 | 4 | `pgn` backend swap: GPL `shakmaty` → MIT `cozy-chess` + own SAN parser (`src/pgn/san.rs`), same API (0.2.1) | done |
 | 4 | `pgn` SAN: zero-castling `0-0`/`0-0-0` accepted alongside `O-O`/`O-O-O` (forms don't mix) | done |
 | 4 | `pgn` honours `[FEN]`/`[Variant]` header tags (`src/pgn/start.rs`): FEN start position, Chess960 (X-FEN + Shredder-FEN), `PgnError::{InvalidFen, UnsupportedVariant}`, `#[non_exhaustive]` (0.3.0, #50) | done |
+| 4 | `pgn` infers Chess960 without a `Variant` tag from a castling field only Chess960 supports (`castling::implied_variant`, #57) | done |
 
 ## Build & test
 

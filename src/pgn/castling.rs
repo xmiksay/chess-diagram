@@ -37,16 +37,18 @@ pub(super) fn with_castling(board: &Board, field: &str, variant: Variant) -> Opt
 }
 
 /// The variant a castling field implies on its own, for a FEN exported
-/// without a `Variant` tag: Chess960 when some right it grants only exists
-/// there (a king off the e-file, or a rook off a/h — e.g. Shredder `GEge`),
-/// else standard. Rights no variant supports (a blanket `KQkq` with no
-/// rooks) imply nothing.
+/// without a `Variant` tag: Chess960 when every right it grants exists there
+/// and some only exists there (a king off the e-file, or a rook off a/h —
+/// e.g. Shredder `GEge`), else standard. A blanket `KQkq` on a standard
+/// board with a castled king (`5RK1`: `Q` fits Chess960's f-rook, `K` fits
+/// nothing) has an unsupportable letter, so it implies nothing rather than
+/// granting the king a bogus `O-O-O`.
 pub(super) fn implied_variant(board: &Board, field: &str) -> Variant {
-    let chess960_only = field.chars().any(|c| {
-        let right = |variant| castling_right(board, color_of(c), c.to_ascii_lowercase(), variant);
-        right(Variant::Chess960).is_some() && right(Variant::Standard).is_none()
-    });
-    if chess960_only {
+    let right =
+        |c: char, variant| castling_right(board, color_of(c), c.to_ascii_lowercase(), variant);
+    let chess960 = field.chars().all(|c| right(c, Variant::Chess960).is_some())
+        && field.chars().any(|c| right(c, Variant::Standard).is_none());
+    if chess960 {
         Variant::Chess960
     } else {
         Variant::Standard
