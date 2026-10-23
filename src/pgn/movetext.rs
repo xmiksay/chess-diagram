@@ -60,18 +60,20 @@ pub(super) fn tokens(pgn: &str) -> impl Iterator<Item = Token<'_>> {
     let pgn = pgn.strip_prefix('\u{feff}').unwrap_or(pgn);
     let mut rest = pgn;
     let mut variation_depth = 0u32;
-    let mut in_movetext = false;
     let mut seen_tag = false;
-    let mut header_closed = false;
+    // Set by the first move or by a blank line after a tag: any later tag
+    // pair is the next game's.
+    let mut header_over = false;
     std::iter::from_fn(move || loop {
         let trimmed = rest.trim_start();
         // Latched, so a comment between the blank line and the next game's
         // tags can't hide it. Only whitespace was trimmed, so two newlines in
         // that gap are a blank line.
-        header_closed |= seen_tag
-            && rest
+        if seen_tag && !header_over {
+            header_over = rest
                 .get(..rest.len() - trimmed.len())
                 .is_some_and(|gap| gap.matches('\n').nth(1).is_some());
+        }
         let mut chars = trimmed.chars();
         let Some(first) = chars.next() else {
             rest = "";
@@ -93,7 +95,7 @@ pub(super) fn tokens(pgn: &str) -> impl Iterator<Item = Token<'_>> {
             // section, so a tag after a move or after that blank line is the
             // next game's header even if this game lost its result (or had
             // no moves at all).
-            '[' if variation_depth == 0 && (in_movetext || header_closed) => {
+            '[' if variation_depth == 0 && header_over => {
                 rest = "";
                 return None;
             }
@@ -142,7 +144,7 @@ pub(super) fn tokens(pgn: &str) -> impl Iterator<Item = Token<'_>> {
                 if san.is_empty() {
                     continue;
                 }
-                in_movetext = true;
+                header_over = true;
                 return Some(Token::San(san));
             }
         };
@@ -297,6 +299,9 @@ mod tests {
         assert_eq!(names("[Event \"a\"]\n\n; c\n[Event \"b\"]"), ["Event"]);
         assert_eq!(names("[Event \"a\"] ; c\n\n[Event \"b\"]"), ["Event"]);
         assert_eq!(names("[Event \"a\"]\n%x\n\n[Event \"b\"]"), ["Event"]);
+        // The latch doesn't stop a comment-led movetext after the blank line.
+        assert_eq!(names("[Event \"a\"]\n\n{c}\n1. e4"), ["Event", "e4"]);
+        assert_eq!(names("[Event \"a\"]\n\n; c\n%x\n1. e4"), ["Event", "e4"]);
     }
 
     #[test]

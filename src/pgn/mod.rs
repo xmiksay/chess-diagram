@@ -55,8 +55,8 @@ use start::start_position;
 /// numbers are skipped; a game-result token (`1-0`, `0-1`, `1/2-1/2`, `*`),
 /// or a tag pair after the first move or after the blank line that closes
 /// the header section (the next game, even if this one has no moves), ends
-/// the mainline. Castling is
-/// accepted as `O-O`/`O-O-O` or zero-castling `0-0`/`0-0-0`.
+/// the mainline. Castling is accepted as `O-O`/`O-O-O` or zero-castling
+/// `0-0`/`0-0-0`.
 ///
 /// # Errors
 ///
