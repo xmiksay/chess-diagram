@@ -40,7 +40,7 @@ pub enum PgnError {
 /// Only the mainline is walked: comments (`{...}`, `;`), `%` escape lines,
 /// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, move
 /// numbers, and tag pairs are skipped; a game-result token (`1-0`, `0-1`,
-/// `1/2-1/2`, `*`) ends the mainline.
+/// `1/2-1/2`, `*`), or a tag pair after the first move, ends the mainline.
 ///
 /// # Example
 ///
@@ -227,6 +227,18 @@ mod tests {
     fn result_token_ends_mainline() {
         // A second concatenated game after the result is not part of this mainline.
         let two_games = "1. e4 e5 1-0\n\n[Event \"Next\"]\n1. d4 d5 *";
+        assert_eq!(
+            board_at(two_games, 3),
+            Err(PgnError::PlyOutOfRange {
+                requested: 3,
+                available: 2
+            })
+        );
+    }
+
+    #[test]
+    fn next_game_headers_end_a_resultless_mainline() {
+        let two_games = "1. e4 e5\n\n[Event \"Next\"]\n1. d4 d5";
         assert_eq!(
             board_at(two_games, 3),
             Err(PgnError::PlyOutOfRange {

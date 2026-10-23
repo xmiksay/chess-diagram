@@ -24,8 +24,8 @@ lint: ## fmt-check + clippy (default and all features) with warnings as errors
 test-unit: ## Unit tests (in-module #[cfg(test)], all features)
 	cargo test --lib --all-features
 
-test-integration: ## Integration tests (tests/integration.rs; writes target/test-samples/*.svg)
-	cargo test --test '*'
+test-integration: ## Integration tests (tests/integration.rs, all features; writes target/test-samples/*.svg)
+	cargo test --test '*' --all-features
 
 test-doc: ## Doctests (all features)
 	cargo test --doc --all-features

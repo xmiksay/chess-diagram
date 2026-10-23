@@ -6,13 +6,15 @@
 /// Yields SAN move tokens from a PGN's mainline, skipping tag pairs, move
 /// numbers, `{...}` and `;` comments, `%` escape lines, variations, NAGs, and
 /// `!`/`?` suffix annotations. A game-result token (`1-0`, `0-1`, `1/2-1/2`,
-/// `*`) ends the mainline, so a second concatenated game is never played onto
-/// the first one's board.
+/// `*`) ends the mainline, and so does a tag pair once moves have started (a
+/// result-less game followed by the next game's headers), so a second
+/// concatenated game is never played onto the first one's board.
 pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
     // Editors on Windows prepend a BOM, which isn't whitespace to `trim_start`.
     let pgn = pgn.strip_prefix('\u{feff}').unwrap_or(pgn);
     let mut rest = pgn;
     let mut variation_depth = 0u32;
+    let mut in_movetext = false;
     std::iter::from_fn(move || loop {
         let trimmed = rest.trim_start();
         // `%` escapes a line only in column 0.
@@ -29,6 +31,12 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
             ';' => skip_line(after),
             // Braces don't nest: a `{` inside a comment is literal text.
             '{' => after.split_once('}').map_or("", |(_, tail)| tail),
+            // Tag pairs only precede movetext, so one after a move is the
+            // next game's header section even if this game lost its result.
+            '[' if variation_depth == 0 && in_movetext => {
+                rest = "";
+                return None;
+            }
             '[' if variation_depth == 0 => skip_tag(after),
             '(' => {
                 variation_depth = variation_depth.saturating_add(1);
@@ -69,6 +77,7 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
                 if san.is_empty() {
                     continue;
                 }
+                in_movetext = true;
                 return Some(san);
             }
         };
@@ -121,6 +130,17 @@ mod tests {
             sans("1. e4 { 1-0 } e5 (1... c5 *) 2. Nf3"),
             ["e4", "e5", "Nf3"]
         );
+    }
+
+    #[test]
+    fn tag_pair_after_moves_ends_mainline() {
+        // The first game is missing its result token.
+        assert_eq!(
+            sans("[Event \"a\"]\n1. e4 e5\n\n[Event \"b\"]\n1. d4 d5"),
+            ["e4", "e5"]
+        );
+        // Inside a variation a `[` is not a header.
+        assert_eq!(sans("1. e4 (1. d4 [x]) e5"), ["e4", "e5"]);
     }
 
     #[test]
