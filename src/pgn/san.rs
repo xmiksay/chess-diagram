@@ -1,9 +1,10 @@
 //! SAN tokens → legal `cozy_chess` moves. The accepted grammar mirrors
 //! shakmaty 0.30's `San::from_ascii` (the previous backend) so swapping the
-//! move generator doesn't change which movetext [`board_at`](super::board_at)
-//! accepts or which error it reports.
+//! move generator doesn't change which SAN tokens [`board_at`](super::board_at)
+//! accepts or which error it reports for them. (Movetext-level changes — what
+//! counts as a token — live in `movetext.rs`.)
 
-use cozy_chess::{Board, File, Move, Piece, Rank, Square};
+use cozy_chess::{BitBoard, Board, File, Move, Piece, Rank, Square};
 
 /// A syntactically valid SAN move, not yet checked against a position.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,15 +37,30 @@ impl San {
     /// Resolves to the unique legal move this SAN names in `board`; `None`
     /// when no legal move matches or the match is ambiguous.
     pub(super) fn to_move(self, board: &Board) -> Option<Move> {
-        // Only the named piece type can match, so skip generating the rest.
-        let role = match self {
-            San::Normal { role, .. } => role,
-            San::Castle { .. } => Piece::King,
+        // Only moves that can match are generated: the named piece type on the
+        // disambiguating file/rank, to the named square (castling lands on an
+        // own rook).
+        let us = board.side_to_move();
+        let (from, to) = match self {
+            San::Normal {
+                role,
+                file,
+                rank,
+                to,
+                ..
+            } => (
+                board.colored_pieces(us, role)
+                    & file.map_or(BitBoard::FULL, File::bitboard)
+                    & rank.map_or(BitBoard::FULL, Rank::bitboard),
+                to.bitboard(),
+            ),
+            San::Castle { .. } => (board.colored_pieces(us, Piece::King), board.colors(us)),
             San::Unplayable => return None,
         };
         let mut found = None;
         let mut matches = 0usize;
-        board.generate_moves_for(board.pieces(role), |moves| {
+        board.generate_moves_for(from, |mut moves| {
+            moves.to &= to;
             for mv in moves {
                 if self.matches(board, moves.piece, mv) {
                     found = Some(mv);

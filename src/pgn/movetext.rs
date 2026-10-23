@@ -17,9 +17,6 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
     let mut in_movetext = false;
     std::iter::from_fn(move || loop {
         let trimmed = rest.trim_start();
-        // `%` escapes a line only in column 0.
-        let offset = pgn.len() - trimmed.len();
-        let line_start = offset == 0 || pgn.get(..offset).is_some_and(|p| p.ends_with('\n'));
         let mut chars = trimmed.chars();
         let Some(first) = chars.next() else {
             rest = "";
@@ -27,7 +24,13 @@ pub(super) fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
         };
         let after = chars.as_str();
         rest = match first {
-            '%' if line_start => skip_line(after),
+            // `%` escapes a line only in column 0.
+            '%' if pgn
+                .get(..pgn.len() - trimmed.len())
+                .is_some_and(|p| p.is_empty() || p.ends_with('\n')) =>
+            {
+                skip_line(after)
+            }
             ';' => skip_line(after),
             // Braces don't nest: a `{` inside a comment is literal text.
             '{' => after.split_once('}').map_or("", |(_, tail)| tail),
