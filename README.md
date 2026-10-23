@@ -186,7 +186,7 @@ loading — those belong to the consumers.
   | Feature | Default | Adds | Gives you |
   |---|---|---|---|
   | `svg` | yes | nothing (pure Rust) | `SvgRenderer`, `render_svg` |
-  | `pgn` | no | `shakmaty` | `pgn::board_at(pgn, ply)` — walk a PGN mainline to a ply, get a `Board` to render |
+  | `pgn` | no | `cozy-chess` (MIT, no transitive deps beyond its own types crate) | `pgn::board_at(pgn, ply)` — walk a PGN mainline to a ply, get a `Board` to render |
   | `png` | no | `resvg` (implies `svg`) | `png::render_png(fen, opts)` — rasterise to `Options::size`-square PNG bytes |
 
   With `features = ["pgn"]`:
@@ -217,7 +217,7 @@ Everything runs through the Makefile (`make help` lists all targets):
 ```bash
 make build      # debug build
 make test       # unit + integration + doctests
-make lint       # cargo fmt --check + clippy -D warnings
+make lint       # cargo fmt --check + clippy -D warnings (default and all features)
 make verify     # lint + test — the hard gate before any push
 make gallery    # regenerate the README gallery under assets/gallery/*.svg
 ```

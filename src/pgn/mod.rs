@@ -1,16 +1,18 @@
 //! PGN → `Board` at a given ply. `#[cfg(feature = "pgn")]` only: walks the
-//! mainline of a PGN game with `shakmaty` (SAN disambiguation, castling, en
-//! passant, promotion) and converts the resulting position into this
-//! crate's [`Board`]. Never touches the default (`FenError`-only) parse
-//! layer contract — errors here are [`PgnError`], a separate type.
+//! mainline of a PGN game, resolving each SAN token (disambiguation,
+//! castling, en passant, promotion) against `cozy-chess`'s legal move
+//! generator, and converts the resulting position into this crate's
+//! [`Board`]. Never touches the default (`FenError`-only) parse layer
+//! contract — errors here are [`PgnError`], a separate type.
 
-use shakmaty::{
-    san::San, Chess, Color as ShakmatyColor, Piece as ShakmatyPiece, Position,
-    Square as ShakmatySquare,
-};
+mod movetext;
+mod san;
+
 use thiserror::Error;
 
 use crate::board::{Board, Color, Piece, Role};
+use movetext::mainline_sans;
+use san::San;
 
 /// Errors from walking a PGN movetext. Kept separate from [`FenError`](crate::FenError)
 /// so the default build's error surface is unaffected by this feature.
@@ -35,9 +37,10 @@ pub enum PgnError {
 /// Walks `pgn`'s mainline to half-move `ply` (`0` = the starting position,
 /// `1` = after White's first move, …) and returns the resulting [`Board`].
 ///
-/// Only the mainline is walked: comments (`{...}`), variations (`(...)`),
-/// NAGs (`$1`), move numbers, and headers are skipped; a game-result token
-/// (`1-0`, `0-1`, `1/2-1/2`, `*`) ends the mainline.
+/// Only the mainline is walked: comments (`{...}`, `;`), `%` escape lines,
+/// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, move
+/// numbers, and tag pairs are skipped; a game-result token (`1-0`, `0-1`,
+/// `1/2-1/2`, `*`), or a tag pair after the first move, ends the mainline.
 ///
 /// # Example
 ///
@@ -49,109 +52,65 @@ pub enum PgnError {
 /// # Ok::<(), chess_diagram::pgn::PgnError>(())
 /// ```
 pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
-    let mut pos = Chess::default();
-    for (played, token) in mainline_sans(pgn).enumerate() {
-        if played == ply {
-            break;
-        }
-        let san = San::from_ascii(token.as_bytes())
-            .map_err(|_| PgnError::InvalidSan(token.to_string()))?;
+    let mut pos = cozy_chess::Board::startpos();
+    let mut played = 0;
+    for token in mainline_sans(pgn).take(ply) {
+        let san = San::parse(token).ok_or_else(|| PgnError::InvalidSan(token.to_string()))?;
         let mv = san
             .to_move(&pos)
+            .ok_or_else(|| PgnError::IllegalMove(token.to_string()))?;
+        // `mv` came from the legal move list, so this can't fail today; kept
+        // over `play_unchecked` because that one panics on an illegal move.
+        pos.try_play(mv)
             .map_err(|_| PgnError::IllegalMove(token.to_string()))?;
-        pos = pos
-            .play(mv)
-            .map_err(|_| PgnError::IllegalMove(token.to_string()))?;
+        played += 1;
     }
 
-    let available = mainline_sans(pgn).count();
-    if ply > available {
+    // `take(ply)` only stops short when the mainline runs out.
+    if played < ply {
         return Err(PgnError::PlyOutOfRange {
             requested: ply,
-            available,
+            available: played,
         });
     }
 
     Ok(convert_board(&pos))
 }
 
-fn convert_board(pos: &Chess) -> Board {
+fn convert_board(pos: &cozy_chess::Board) -> Board {
     let mut squares = [None; 64];
-    for i in 0..64u8 {
-        let sq = ShakmatySquare::new(u32::from(i));
-        if let Some(piece) = pos.board().piece_at(sq) {
-            squares[usize::from(i)] = Some(convert_piece(piece));
-        }
+    // Both models index squares rank-major from a1, so the orders line up.
+    for (slot, sq) in squares.iter_mut().zip(cozy_chess::Square::ALL) {
+        *slot = pos
+            .piece_on(sq)
+            .zip(pos.color_on(sq))
+            .map(|(role, color)| Piece {
+                color: convert_color(color),
+                role: convert_role(role),
+            });
     }
     Board {
         squares,
-        side_to_move: convert_color(pos.turn()),
+        side_to_move: convert_color(pos.side_to_move()),
     }
 }
 
-fn convert_piece(piece: ShakmatyPiece) -> Piece {
-    Piece {
-        color: convert_color(piece.color),
-        role: convert_role(piece.role),
-    }
-}
-
-fn convert_color(color: ShakmatyColor) -> Color {
+fn convert_color(color: cozy_chess::Color) -> Color {
     match color {
-        ShakmatyColor::White => Color::White,
-        ShakmatyColor::Black => Color::Black,
+        cozy_chess::Color::White => Color::White,
+        cozy_chess::Color::Black => Color::Black,
     }
 }
 
-fn convert_role(role: shakmaty::Role) -> Role {
+fn convert_role(role: cozy_chess::Piece) -> Role {
     match role {
-        shakmaty::Role::Pawn => Role::Pawn,
-        shakmaty::Role::Knight => Role::Knight,
-        shakmaty::Role::Bishop => Role::Bishop,
-        shakmaty::Role::Rook => Role::Rook,
-        shakmaty::Role::Queen => Role::Queen,
-        shakmaty::Role::King => Role::King,
+        cozy_chess::Piece::Pawn => Role::Pawn,
+        cozy_chess::Piece::Knight => Role::Knight,
+        cozy_chess::Piece::Bishop => Role::Bishop,
+        cozy_chess::Piece::Rook => Role::Rook,
+        cozy_chess::Piece::Queen => Role::Queen,
+        cozy_chess::Piece::King => Role::King,
     }
-}
-
-/// Yields SAN move tokens from a PGN's mainline, skipping header tags,
-/// move numbers, comments, variations, NAGs, and the trailing result token.
-///
-/// Header tag lines (`[Event "..."]`) are dropped whole, since a quoted tag
-/// value may itself contain whitespace; everything else is tokenized
-/// word-by-word with brace/paren depth tracked across words so a comment or
-/// variation spanning several words is skipped in full.
-fn mainline_sans(pgn: &str) -> impl Iterator<Item = &str> {
-    let mut brace_depth: u32 = 0;
-    let mut paren_depth: u32 = 0;
-    pgn.lines()
-        .filter(|line| !line.trim_start().starts_with('['))
-        .flat_map(str::split_whitespace)
-        .filter_map(move |word| {
-            if brace_depth > 0 || word.starts_with('{') {
-                brace_depth = brace_depth
-                    .saturating_add(word.matches('{').count() as u32)
-                    .saturating_sub(word.matches('}').count() as u32);
-                return None;
-            }
-            if paren_depth > 0 || word.starts_with('(') {
-                paren_depth = paren_depth
-                    .saturating_add(word.matches('(').count() as u32)
-                    .saturating_sub(word.matches(')').count() as u32);
-                return None;
-            }
-            if word.starts_with('$') {
-                return None;
-            }
-            if matches!(word, "1-0" | "0-1" | "1/2-1/2" | "*") {
-                return None;
-            }
-            let san = word.trim_start_matches(|c: char| c.is_ascii_digit() || c == '.');
-            if san.is_empty() {
-                return None;
-            }
-            Some(san)
-        })
 }
 
 #[cfg(test)]
@@ -266,8 +225,27 @@ mod tests {
 
     #[test]
     fn result_token_ends_mainline() {
-        let available = mainline_sans("1. e4 e5 2. Qh5 Nc6 3. Bc4 Nf6 4. Qxf7# 1-0").count();
-        assert_eq!(available, 7);
+        // A second concatenated game after the result is not part of this mainline.
+        let two_games = "1. e4 e5 1-0\n\n[Event \"Next\"]\n1. d4 d5 *";
+        assert_eq!(
+            board_at(two_games, 3),
+            Err(PgnError::PlyOutOfRange {
+                requested: 3,
+                available: 2
+            })
+        );
+    }
+
+    #[test]
+    fn next_game_headers_end_a_resultless_mainline() {
+        let two_games = "1. e4 e5\n\n[Event \"Next\"]\n1. d4 d5";
+        assert_eq!(
+            board_at(two_games, 3),
+            Err(PgnError::PlyOutOfRange {
+                requested: 3,
+                available: 2
+            })
+        );
     }
 
     #[test]
@@ -282,6 +260,51 @@ mod tests {
                 role: Role::Knight
             })
         );
+    }
+
+    #[test]
+    fn opera_game_to_mate() {
+        // Morphy's Opera Game: disambiguation (Nbd7), queenside castling,
+        // check/mate suffixes, and the result token.
+        let pgn = "1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 \
+                   7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 \
+                   12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 \
+                   16. Qb8+ Nxb8 17. Rd8# 1-0";
+        let board = board_at(pgn, 33).expect("valid PGN");
+        let at = |sq| board.piece_at(Square::from_algebraic(sq).unwrap());
+        let white = |role| {
+            Some(Piece {
+                color: Color::White,
+                role,
+            })
+        };
+        assert_eq!(at("d8"), white(Role::Rook));
+        assert_eq!(at("c1"), white(Role::King));
+        assert_eq!(at("g5"), white(Role::Bishop));
+        assert_eq!(
+            at("b8"),
+            Some(Piece {
+                color: Color::Black,
+                role: Role::Knight
+            })
+        );
+        assert_eq!(board.side_to_move, Color::Black);
+    }
+
+    #[test]
+    fn ambiguous_san_is_illegal() {
+        // Both the b1 and f3 knights can reach the vacated d2.
+        assert_eq!(
+            board_at("1. d4 a6 2. Nf3 a5 3. Nd2", 5),
+            Err(PgnError::IllegalMove("Nd2".to_string()))
+        );
+        assert!(board_at("1. d4 a6 2. Nf3 a5 3. Nbd2", 5).is_ok());
+    }
+
+    #[test]
+    fn annotated_moves_play() {
+        let board = board_at("1. e4! e5?! 2. Nf3!! Nc6", 4).expect("valid PGN");
+        assert_eq!(board.side_to_move, Color::White);
     }
 
     #[test]
@@ -305,8 +328,7 @@ mod tests {
 
     #[test]
     fn illegal_move() {
-        // Nc3 isn't legal here — no knight can reach c3 from the start position via this SAN? Use a
-        // syntactically valid but illegal SAN instead: Ke2 with the king boxed in at move 1.
+        // Syntactically valid but illegal: the king is boxed in at move 1.
         assert_eq!(
             board_at("1. Ke2", 1),
             Err(PgnError::IllegalMove("Ke2".to_string()))

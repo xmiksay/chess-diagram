@@ -10,24 +10,25 @@ help: ## Show this help
 build: ## Debug build (library)
 	cargo build
 
-check: ## Fast typecheck of all targets
-	cargo check --all-targets
+check: ## Fast typecheck of all targets (all features)
+	cargo check --all-targets --all-features
 
 fmt: ## Apply formatting
 	cargo fmt
 
-lint: ## fmt-check + clippy with warnings as errors
+lint: ## fmt-check + clippy (default and all features) with warnings as errors
 	cargo fmt --check
 	cargo clippy --all-targets -- -D warnings
+	cargo clippy --all-targets --all-features -- -D warnings
 
-test-unit: ## Unit tests (in-module #[cfg(test)])
-	cargo test --lib
+test-unit: ## Unit tests (in-module #[cfg(test)], all features)
+	cargo test --lib --all-features
 
-test-integration: ## Integration tests (tests/integration.rs; writes target/test-samples/*.svg)
-	cargo test --test '*'
+test-integration: ## Integration tests (tests/integration.rs, all features; writes target/test-samples/*.svg)
+	cargo test --test '*' --all-features
 
-test-doc: ## Doctests (lib.rs examples)
-	cargo test --doc
+test-doc: ## Doctests (all features)
+	cargo test --doc --all-features
 
 test: test-unit test-integration test-doc ## All tests (unit + integration + doctest)
 
@@ -37,8 +38,8 @@ golden-update: ## Rewrite tests/golden/*.svg fixtures from the current renderer 
 gallery: ## Regenerate the README gallery under assets/gallery/*.svg
 	cargo run --example gallery
 
-doc: ## Build rustdoc
-	cargo doc --no-deps
+doc: ## Build rustdoc (all features, warnings as errors — same as CI and docs.rs)
+	RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --lib --all-features
 
 package: ## Dry-run crates.io packaging
 	cargo package --allow-dirty

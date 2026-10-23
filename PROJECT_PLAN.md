@@ -46,7 +46,7 @@ The core is a pure function `FEN → String`. No I/O, no async, no asset provide
 | v1 output | **SVG only** | The one format every consumer needs. Named format-neutrally so PNG/typst are additive later, not a rename. |
 | Rendering technique | **Hand-emitted SVG strings** (like `mermaid-svg`) | Keeps deps at zero. A typst-compiled board would pull in `typst`/`typst-pdf`/`typst-as-lib` — tens of heavy crates — for output the consumer (mdcast) already knows how to place. Wrong layer. |
 | Chess logic in core | **None** — hand-rolled FEN piece-placement parse only | Rendering a position needs only the placement field (ranks split on `/`, digits = gaps, letters = pieces). `shakmaty` would be a large dep for a 30-line parse. |
-| PGN → position | **Deferred to an optional `pgn` feature** (or the caller) | SAN application (disambiguation, castling, en passant, promotion) is real work; when needed it gates `shakmaty` behind a feature so the FEN-only core stays dep-free. The site already knows the move index. |
+| PGN → position | **Deferred to an optional `pgn` feature** (or the caller) | SAN application (disambiguation, castling, en passant, promotion) is real work; when needed it gates a move generator (`cozy-chess`, MIT) behind a feature so the FEN-only core stays dep-free. The site already knows the move index. |
 | Renderer interface | **`Renderer` trait: `format()` + `render()`** | Direct analog of mdcast's `Backend { target(); render_to_bytes() }`, minus async/assets. The one v1 impl is `SvgRenderer`; the trait is the extensibility seam. |
 | Convenience API | **Free functions `render_svg` / `parse`** | Mirrors `mermaid-svg`'s `render` / `render_with` / `parse` ergonomics for the one-liner case. |
 | Piece artwork | **Cburnett set, BSD variant, vendored as `&str` consts** | Public, widely used, license-clean; no runtime asset loading (no `rust-embed`) — pieces are just string constants, same spirit as `mermaid-svg`'s inline markup. |
@@ -143,7 +143,7 @@ chess-diagram/
 │  │     ├─ grid.rs           # base squares + highlight/check overlay rects
 │  │     └─ coordinates.rs    # file/rank coordinate labels
 │  ├─ pieces.rs               # Cburnett BSD piece SVG path consts (feature = "svg")
-│  └─ pgn.rs                  # #[cfg(feature = "pgn")] FEN-at-move-N (gates shakmaty)
+│  └─ pgn/                    # #[cfg(feature = "pgn")] FEN-at-move-N (gates cozy-chess; own SAN parser)
 ├─ examples/gallery.rs        # render sample FENs to files (doc gallery)
 ├─ tests/golden/              # snapshot fixtures (start pos, mid-game, mate, flipped)
 ├─ assets/LICENSE-pieces      # Cburnett BSD notice
@@ -156,12 +156,12 @@ chess-diagram/
 [features]
 default = ["svg"]
 svg   = []                 # hand-emitted SVG + embedded piece consts (no deps)
-pgn   = ["dep:shakmaty"]   # walk a PGN to move N → FEN; opt-in heavy dep
+pgn   = ["dep:cozy-chess"] # walk a PGN to move N → FEN; opt-in
 png   = ["svg", "dep:resvg"] # rasterise SVG → PNG bytes; opt-in
 
 [dependencies]
 thiserror = "2"
-shakmaty  = { version = "0.27", optional = true }
+cozy-chess = { version = "0.3", optional = true }
 resvg     = { version = "0.44", optional = true }
 ```
 
@@ -192,7 +192,7 @@ notice, publish `0.1` to crates.io.
 **Done when:** `cargo publish --dry-run` is clean and docs.rs renders.
 
 ### Phase 3 — Optional features (deferred, on demand)
-`pgn` (walk to move N via `shakmaty`) and `png` (`resvg`) — each an additive
+`pgn` (walk to move N via `cozy-chess`) and `png` (`resvg`) — each an additive
 feature-gated module, triggered by a real consumer asking, not pre-built.
 **Done when:** a consumer that needs one enables the feature; default builds are
 byte-identical and dep-identical to before.
@@ -208,14 +208,14 @@ Cargo feature, never a teardown.
 
 | Future move | Trigger (not "nice to have") | Scope when taken |
 |---|---|---|
-| ~~`pgn` feature~~ | ~~A consumer needs FEN-at-move-N and can't compute it (the site can, ChessBase already parses PGN)~~ | **Shipped in Phase 3**: `pgn::board_at(pgn, ply) -> Result<Board, PgnError>` (`src/pgn.rs`, `#[cfg(feature = "pgn")]`) walks a PGN mainline via `shakmaty` (SAN disambiguation, castling, en passant, promotion) and converts its position into this crate's `Board`; core untouched, `PgnError` stays separate from `FenError`. |
+| ~~`pgn` feature~~ | ~~A consumer needs FEN-at-move-N and can't compute it (the site can, ChessBase already parses PGN)~~ | **Shipped in Phase 3**: `pgn::board_at(pgn, ply) -> Result<Board, PgnError>` (`src/pgn/`, `#[cfg(feature = "pgn")]`) walks a PGN mainline (originally via `shakmaty`) (SAN disambiguation, castling, en passant, promotion) and converts its position into this crate's `Board`; core untouched, `PgnError` stays separate from `FenError`. **0.2.1** swapped the backend: `shakmaty` is GPL-3.0-or-later, which made any `pgn`-enabled binary GPL despite this crate's MIT license, so it was replaced by MIT `cozy-chess` (move generation) plus an in-crate SAN parser (`src/pgn/san.rs`) that mirrors shakmaty 0.30's grammar — same API, same accepted SAN, same error kinds. The movetext lexer was rewritten alongside it (character-level: glued `{...}` comments, `;`/`%` comments, `!`/`?` suffixes), and a result token now ends the mainline, so a concatenated second game is no longer played onto the first. |
 | ~~`png` feature~~ | ~~A consumer needs raster (thumbnail, non-SVG channel)~~ | **Shipped in Phase 3**: `png::render_png(fen, opts) -> Result<Vec<u8>, PngError>` (`src/png.rs`, `#[cfg(feature = "png")]`, implies `svg`) renders via `render_svg` then rasterises with `resvg`/`usvg`/`tiny-skia`, loading system fonts through `fontdb` for the `sans-serif` coordinate/badge text; `PngError` stays separate from `FenError`. |
 | `typst` output | mdcast wants a native-typst board instead of an embedded SVG | New `Format::Typst` impl of the **same trait**; string output, no new dep. |
 | ~~Arrows / annotations~~ | ~~Study/analysis rendering needs them (ChessBase)~~ | **Shipped in Phase 3**: `Options::shapes: Vec<Shape>` (`src/annotation.rs`), a `Shape`/`ArrowShape` model mirroring chessground's `Shape` field-for-field so a `study_set_shapes` payload forwards with no translation — circles, straight/knight-elbow arrows (`Shape::dest` + `ArrowShape::{Auto,Straight,Elbow}`), and text badges (`Shape::text`), each additive `SvgRenderer` emission (`src/render/svg/{shapes,arrows,text}.rs`). |
 | ~~Custom themes~~ | ~~Branding parity with a consumer's design~~ | **Shipped in Phase 3**: `Theme::brown()`/`blue()`/`green()` presets (`src/options.rs`) — plain constructors alongside the existing hand-constructible `Theme` struct; `brown()` matches `Theme::default()` byte-for-byte. Piece-set indirection remains unshipped — no second set has a license-clean source yet; add it only when one does. |
 
 **Hard rule:** the default feature set never gains a heavy dependency. Every
-engine-grade dep (typst, shakmaty, resvg) lives behind an opt-in feature. That
+engine-grade dep (typst, cozy-chess, resvg) lives behind an opt-in feature. That
 is the whole point of "footprint like `mermaid-svg`."
 
 ## 11. Downstream consumers (why this earns its place)

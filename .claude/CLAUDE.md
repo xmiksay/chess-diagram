@@ -44,14 +44,24 @@ Two layers behind one seam:
   all impls; `src/annotation.rs` holds the `Shape`/`ArrowShape` annotation
   model (mirrors chessground's `Shape` — not part of `board.rs`, since
   annotations are a rendering concern).
-- **PGN layer** — `src/pgn.rs` (`#[cfg(feature = "pgn")]`, opt-in): `pub fn
-  board_at(pgn: &str, ply: usize) -> Result<Board, PgnError>` walks a PGN
-  mainline via `shakmaty` (SAN disambiguation, castling, en passant,
-  promotion all delegated to it) and converts `shakmaty`'s `Board`/`Color`/
-  `Role`/`Piece` into this crate's model. `mainline_sans` tokenizes the
-  movetext (drops header-tag lines whole since a quoted value may contain
-  whitespace; tracks brace/paren depth across words so multi-word comments
-  and variations are skipped in full; stops at a result token). Errors are
+- **PGN layer** — `src/pgn/` (`#[cfg(feature = "pgn")]`, opt-in): `pub fn
+  board_at(pgn: &str, ply: usize) -> Result<Board, PgnError>` (`mod.rs`)
+  walks a PGN mainline on a `cozy-chess` board and converts its
+  `Color`/`Piece` into this crate's model. `san.rs` is our own SAN parser —
+  grammar deliberately mirrors shakmaty 0.30's `San::from_ascii` (the
+  previous, GPL backend) so the swap changed no accepted input or error
+  kind — and resolves a SAN to the unique matching move from cozy-chess's
+  legal move generator (disambiguation, capture marker, promotion must all
+  match; an ambiguous SAN is `IllegalMove`). cozy-chess encodes castling as
+  the king capturing its own rook, so `O-O`/`O-O-O` match that king move and
+  a plain `K` SAN never does. `movetext.rs`'s `mainline_sans` is a
+  character-level lexer over the PGN (PGN delimiters are self-terminating,
+  so a word/line splitter mis-handles glued comments like `e4{best}`): it
+  skips `[Tag "value"]` pairs (quote-aware), `{...}` comments (non-nesting,
+  may span lines), `;` rest-of-line comments, column-0 `%` escape lines,
+  `$n` NAGs, `!`/`?` suffix annotations, a leading BOM, move numbers and
+  nested `(...)` variations, and stops for good at a result token or at a
+  tag pair after the first move (a result-less game's successor). Errors are
   `PgnError`, a type separate from `FenError` — this module never touches
   the parse layer or its error contract.
 - **PNG layer** — `src/png.rs` (`#[cfg(feature = "png")]`, opt-in, implies
@@ -70,7 +80,7 @@ Extension seams:
 - **New output format** = new `Format` variant (the enum is
   `#[non_exhaustive]`) + one new `Renderer` impl under `src/render/`. Never a
   parse-layer change.
-- **Heavier capability** = opt-in Cargo feature: `pgn` (gates `shakmaty`) and
+- **Heavier capability** = opt-in Cargo feature: `pgn` (gates `cozy-chess`) and
   `png` (gates `resvg`, implies `svg`), both landed. **The default feature set
   never gains a heavy dependency.**
 
@@ -94,9 +104,10 @@ Extension seams:
 | 3 | Knight/elbow arrows (`Shape::dest` + `Elbow`/knight-move `Auto`, `src/render/svg/arrows.rs`) — bent shaft, same marker/trim conventions | done |
 | 3 | Arrow sizing: chessground-proportioned arrowhead (was 10× oversized), per-shape `Shape::width`, `Options::arrow_opacity` group transparency | done |
 | 3 | Per-square text badges (`Shape::text`, `src/render/svg/text.rs`) rendered above the arrows, XML-escaped | done |
-| 3 | `pgn` feature: `pgn::board_at` (FEN-at-move-N via `shakmaty`), `PgnError`, feature-matrix CI job | done |
+| 3 | `pgn` feature: `pgn::board_at` (FEN-at-move-N, originally via `shakmaty`), `PgnError`, feature-matrix CI job | done |
 | 3 | `png` feature: `png::render_png` (SVG → PNG bytes via `resvg`, `src/png.rs`), `PngError`, system-fontdb text | done |
 | 3 | Theme presets: `Theme::brown()`/`blue()`/`green()` (plain constructors, `Theme` stays hand-constructible) | done |
+| 4 | `pgn` backend swap: GPL `shakmaty` → MIT `cozy-chess` + own SAN parser (`src/pgn/san.rs`), same API (0.2.1) | done |
 
 ## Build & test
 
@@ -104,9 +115,9 @@ Drive everything through the Makefile (`make help` lists all targets):
 
 ```bash
 make build              # debug build
-make check              # fast typecheck of all targets
-make test               # all tests (unit + integration + doctest)
-make lint               # cargo fmt --check + clippy --all-targets -D warnings
+make check              # fast typecheck of all targets (all features)
+make test               # all tests (unit + integration + doctest, --all-features)
+make lint               # cargo fmt --check + clippy --all-targets -D warnings (default and --all-features)
 make verify             # lint + test — the hard gate before any push
 make gallery            # regenerate the README gallery under assets/gallery/*.svg
 make golden-update      # rewrite tests/golden/*.svg from current renderer output
@@ -136,8 +147,11 @@ CI (`.github/workflows/ci.yml`) runs a `feature-matrix` job alongside the
 main `test` job: `cargo check --no-default-features --lib` (proves the bare
 parse layer still compiles `thiserror`-only with every optional feature off)
 and `cargo test --all-features --all-targets` (exercises `pgn` and `png`
-together, and any future opt-in feature). Run the `png` tests locally with
-`cargo test --features png`.
+together, and any future opt-in feature). Locally, `make lint`/`make test`
+already pass `--all-features` to clippy and every test target, so the `pgn`
+and `png` modules are linted and tested by `make verify` too. Clippy also
+runs once on the default feature set (locally and in CI), so a lint that only
+fires when the opt-in features are off can't slip past the gate.
 
 ## Release procedure
 
