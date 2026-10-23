@@ -28,7 +28,7 @@ pub enum PgnError {
     #[error("invalid FEN tag {0:?}")]
     InvalidFen(String),
     /// The `Variant` header tag (carried here, unescaped) names a variant
-    /// other than standard chess or Chess960.
+    /// whose move rules differ from standard chess and Chess960.
     #[error("unsupported variant {0:?}")]
     UnsupportedVariant(String),
     /// `ply` asked for more half-moves than the mainline contains.
@@ -51,18 +51,22 @@ pub enum PgnError {
 /// `1` = after the first move, …) and returns the resulting [`Board`].
 ///
 /// The walk starts from the position in the game's `FEN` header tag when
-/// there is one (with or without `[SetUp "1"]`, which many exporters omit),
-/// otherwise from the standard start position. `ply` counts from that
+/// there is one (with or without `[SetUp "1"]`, which many exporters omit;
+/// an explicit `[SetUp "0"]` overrides it), otherwise from the standard start
+/// position. `ply` counts from that
 /// position, and the side to move follows the FEN's, so a FEN with Black to
 /// move takes Black's move (`1... e5`) as ply 1. Only the header section
 /// before the first move is read.
 ///
-/// The `Variant` tag selects the rules: absent or standard chess
-/// (`Standard`, `From Position`, …) plays standard chess; Chess960
+/// The `Variant` tag selects the rules: absent, empty, standard chess
+/// (`Standard`, `From Position`, …) or a variant with standard move rules
+/// (`Three-check`, `King of the Hill`) plays standard chess; Chess960
 /// (`Chess960`, `Chess 960`, `Fischerandom`, …, case-insensitive) accepts a
 /// FEN with X-FEN (`KQkq`, outermost rook) or Shredder-FEN (`HAha`) castling
 /// rights and resolves `O-O`/`O-O-O` by rook side, and starts from the
-/// standard position (Chess960 position 518) without a `FEN` tag.
+/// standard position (Chess960 position 518) without a `FEN` tag. Castling
+/// rights the position can't support (a blanket `KQkq` with no rooks, a
+/// non-standard king square outside Chess960) are dropped, not an error.
 ///
 /// Only the mainline is walked: comments (`{...}`, `;`), `%` escape lines,
 /// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, and move
@@ -73,8 +77,8 @@ pub enum PgnError {
 /// # Errors
 ///
 /// [`PgnError::UnsupportedVariant`] for any other `Variant`;
-/// [`PgnError::InvalidFen`] when the `FEN` tag doesn't parse or grants
-/// castling rights the variant can't have; [`PgnError::InvalidSan`] /
+/// [`PgnError::InvalidFen`] when the `FEN` tag doesn't parse;
+/// [`PgnError::InvalidSan`] /
 /// [`PgnError::IllegalMove`] for a bad mainline move; and
 /// [`PgnError::PlyOutOfRange`] when the mainline is shorter than `ply`.
 ///
@@ -95,13 +99,19 @@ pub enum PgnError {
 /// ```
 pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
     let mut tokens = tokens(pgn).peekable();
-    let (mut fen, mut variant) = (None, None);
+    let (mut fen, mut variant, mut setup) = (None, None, None);
     while let Some(Token::Tag(tag)) = tokens.next_if(|t| matches!(t, Token::Tag(_))) {
         match tag.name {
             "FEN" => fen = Some(unescape(tag.value)),
             "Variant" => variant = Some(unescape(tag.value)),
+            "SetUp" => setup = Some(unescape(tag.value)),
             _ => {}
         }
+    }
+    // `SetUp "0"` explicitly declares the standard start; a FEN tag beside it
+    // is stale. Absent `SetUp` doesn't count: many exporters omit it.
+    if setup.as_deref().map(str::trim) == Some("0") {
+        fen = None;
     }
     let mut pos = start_position(fen.as_deref(), variant.as_deref())?;
 

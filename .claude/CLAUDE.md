@@ -69,16 +69,20 @@ Two layers behind one seam:
   nested `(...)` variations, and stops for good at a result token or at a
   tag pair after the first move (a result-less game's successor — so its
   tags are never read as this game's). `start.rs` turns the header's `FEN`
-  tag (`SetUp` not required) and `Variant` tag into the starting cozy
-  board: standard or Chess960 (spelling lists in `STANDARD`/`CHESS960`),
-  anything else `UnsupportedVariant`. Its FEN parse rewrites the castling
-  field itself — cozy's X-FEN mode pins `K`/`Q` to the h/a files, wrong in
-  Chess960 — accepting X-FEN (`K`/`Q` = outermost rook, or a file letter)
-  and Shredder-FEN, then `BoardBuilder` validates; standard chess further
-  requires an e-file king with a/h rooks. Clocks are optional and only
+  tag (`SetUp` not required; an explicit `SetUp "0"` discards it) and
+  `Variant` tag into the starting cozy board: standard rules (incl.
+  Three-check / King of the Hill, which only change the win condition) or
+  Chess960 (spelling lists in `STANDARD`/`CHESS960`), anything else
+  `UnsupportedVariant`. Its FEN parse rewrites the castling field itself —
+  cozy's X-FEN mode pins `K`/`Q` to the h/a files, wrong in Chess960 —
+  accepting X-FEN (`K`/`Q` = outermost rook, or a file letter) and
+  Shredder-FEN. A right the board can't support (no back-rank king/rook,
+  or outside Chess960 anything but an e-file king with an a/h rook) is
+  dropped, not an error — puzzle generators write blanket `KQkq`; a
+  malformed castling field is still invalid. Clocks are optional and only
   checked to be numbers (cozy caps the halfmove clock at 100), and the
-  placement must have 8 ranks (cozy accepts fewer). A bad tag is
-  `InvalidFen`. `ply` counts from that position. Errors are
+  placement must have 8 ranks (cozy accepts fewer). A FEN that doesn't
+  parse is `InvalidFen`. `ply` counts from that position. Errors are
   `PgnError` (`#[non_exhaustive]`), a type separate from `FenError` — this
   module never touches the parse layer or its error contract.
 - **PNG layer** — `src/png.rs` (`#[cfg(feature = "png")]`, opt-in, implies
