@@ -62,10 +62,13 @@ pub(super) fn tokens(pgn: &str) -> impl Iterator<Item = Token<'_>> {
     let mut variation_depth = 0u32;
     let mut in_movetext = false;
     let mut seen_tag = false;
+    let mut header_closed = false;
     std::iter::from_fn(move || loop {
         let trimmed = rest.trim_start();
-        // Only whitespace was trimmed, so two newlines in it are a blank line.
-        let blank_line = rest.len() > trimmed.len()
+        // Latched, so a comment between the blank line and the next game's
+        // tags can't hide it. Only whitespace was trimmed, so two newlines in
+        // that gap are a blank line.
+        header_closed |= seen_tag
             && rest
                 .get(..rest.len() - trimmed.len())
                 .is_some_and(|gap| gap.matches('\n').nth(1).is_some());
@@ -90,7 +93,7 @@ pub(super) fn tokens(pgn: &str) -> impl Iterator<Item = Token<'_>> {
             // section, so a tag after a move or after that blank line is the
             // next game's header even if this game lost its result (or had
             // no moves at all).
-            '[' if variation_depth == 0 && (in_movetext || seen_tag && blank_line) => {
+            '[' if variation_depth == 0 && (in_movetext || header_closed) => {
                 rest = "";
                 return None;
             }
@@ -151,8 +154,10 @@ fn is_delimiter(c: char) -> bool {
     c.is_whitespace() || "{}();[$!?".contains(c)
 }
 
+/// Skips to the end of the line, leaving its newline so a blank line right
+/// after a `;`/`%` comment still reads as one.
 fn skip_line(s: &str) -> &str {
-    s.split_once('\n').map_or("", |(_, tail)| tail)
+    s.find('\n').and_then(|i| s.get(i..)).unwrap_or("")
 }
 
 /// Lexes a `[Name "value"]` tag pair (after its `[`) up to the `]` outside
@@ -286,6 +291,12 @@ mod tests {
         );
         // A blank line before the first tag isn't a header boundary.
         assert_eq!(names("\n\n[Event \"a\"]\n1. e4"), ["Event", "e4"]);
+        // A comment after the blank line doesn't hide it, nor does a line
+        // comment that ends just before it.
+        assert_eq!(names("[Event \"a\"]\n\n{c}\n[Event \"b\"]"), ["Event"]);
+        assert_eq!(names("[Event \"a\"]\n\n; c\n[Event \"b\"]"), ["Event"]);
+        assert_eq!(names("[Event \"a\"] ; c\n\n[Event \"b\"]"), ["Event"]);
+        assert_eq!(names("[Event \"a\"]\n%x\n\n[Event \"b\"]"), ["Event"]);
     }
 
     #[test]
