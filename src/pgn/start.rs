@@ -291,14 +291,14 @@ mod tests {
             board_at(&pgn, 1),
             Err(PgnError::IllegalMove("O-O".to_string()))
         );
-        // Standard-looking rights stay standard, blanket ones included.
+        // Standard Shredder rights stay standard and still castle.
         assert_board(
-            "[FEN \"4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1\"]",
-            0,
-            "4k3/8/8/8/8/8/8/4K3 w",
+            "[FEN \"r3k2r/8/8/8/8/8/8/R3K2R w HAha - 0 1\"]\n1. O-O",
+            1,
+            "r3k2r/8/8/8/8/8/8/R4RK1 b",
         );
-        // A blanket `KQkq` after standard castling stays standard: `Q` alone
-        // would fit a Chess960 f-rook, but `K` fits nothing.
+        // A blanket `KQkq` after standard castling stays standard (`K`/`Q`
+        // never infer), so the f-rook `Q` would name in Chess960 can't castle.
         assert_eq!(
             board_at(
                 "[FEN \"6k1/5ppp/8/8/8/8/5PPP/5RK1 w KQkq - 0 1\"]\n1. O-O-O",

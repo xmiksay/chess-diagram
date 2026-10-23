@@ -31,17 +31,18 @@ use start::start_position;
 /// match regardless of case (`[Fen ...]`), and a repeated tag's last value
 /// wins.
 ///
-/// The `Variant` tag selects the rules: absent, empty, standard chess
-/// (`Standard`, `From Position`, …) or a variant with standard move rules
-/// (`Three-check`, `King of the Hill`) plays standard chess; Chess960
+/// The `Variant` tag selects the rules: standard chess (`Standard`,
+/// `From Position`, …) or a variant with standard move rules
+/// (`Three-check`, `King of the Hill`) plays standard chess, as does an
+/// absent or empty tag (unless the FEN implies Chess960, below); Chess960
 /// (`Chess960`, `Chess 960`, `Fischerandom`, …) accepts X-FEN (`KQkq`,
 /// outermost rook) or Shredder-FEN (`HAha`) castling rights and resolves
 /// `O-O`/`O-O-O` by rook side. Names compare ignoring case, whitespace, `-`
 /// and `_`. Without a `FEN` tag Chess960 starts from the standard position
-/// (Chess960 position 518). Without a `Variant` tag, a FEN whose
-/// Shredder-FEN castling letters name a rook only Chess960 can castle with
-/// (`GEge`) is read as Chess960; `KQkq` never is, since a sloppy standard
-/// puzzle FEN looks the same — add `[Variant "Chess960"]` for X-FEN games.
+/// (Chess960 position 518). Without a `Variant` tag, a FEN with a Shredder-FEN
+/// castling letter `b`–`g` naming a rook (`GEge`) is read as Chess960;
+/// `KQkq`/`HAha` never are, since a sloppy standard puzzle FEN looks the
+/// same — add `[Variant "Chess960"]` for such games.
 ///
 /// FEN fields that can't change the board are read leniently: castling rights
 /// the position can't support (a blanket `KQkq` with no rooks, a non-standard
