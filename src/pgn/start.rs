@@ -80,6 +80,11 @@ fn parse_fen(fen: &str, variant: Variant) -> Option<Board> {
         fields.next()?,
         fields.next()?,
     );
+    // Three-check's checks-remaining field (`3+3`, lichess's `+0+0`) never changes the board.
+    let mut fields = fields.filter(|f| {
+        let counts = f.strip_prefix('+').unwrap_or(f).split_once('+');
+        !counts.is_some_and(|(w, b)| w.parse::<u8>().is_ok() && b.parse::<u8>().is_ok())
+    });
     // Clocks are optional (EPD-style FENs omit them) and never change the
     // board, so they're only checked to be numbers: cozy would also reject a
     // halfmove clock over 100, which a legal (unclaimed) position can have.
@@ -194,7 +199,7 @@ mod tests {
 
     #[test]
     fn invalid_fen_tag_is_an_error() {
-        for fen in ["not a fen", "8/8/8/8/8/8/8/8 w - - 0 1", ""] {
+        for fen in ["not a fen", "8/8/8/8/8/8/8/8 w - - 0 1", "w"] {
             assert_eq!(
                 board_at(&format!("[FEN \"{fen}\"]\n1. e4"), 0),
                 Err(PgnError::InvalidFen(fen.to_string()))
@@ -228,6 +233,10 @@ mod tests {
     fn standard_move_variants_play_like_standard() {
         assert_board("[Variant \"Three-check\"]\n1. e4", 0, START);
         assert_board("[Variant \"King of the Hill\"]\n1. e4", 0, START);
+        for checks in ["3+3 0 1", "0 1 +0+0"] {
+            let pgn = format!("[Variant \"Three-check\"]\n[FEN \"{START} KQkq - {checks}\"]");
+            assert_board(&pgn, 0, START);
+        }
     }
 
     #[test]

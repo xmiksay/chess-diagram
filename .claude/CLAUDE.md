@@ -80,7 +80,8 @@ Two layers behind one seam:
   or outside Chess960 anything but an e-file king with an a/h rook) is
   dropped, not an error — puzzle generators write blanket `KQkq`; a
   malformed castling field is still invalid. Clocks are optional and only
-  checked to be numbers (cozy caps the halfmove clock at 100), and the
+  checked to be numbers (cozy caps the halfmove clock at 100), a
+  Three-check checks-remaining field (`3+3` / lichess `+0+0`) is ignored, and the
   placement must have 8 ranks (cozy accepts fewer). A FEN that doesn't
   parse is `InvalidFen`. `ply` counts from that position. Errors are
   `PgnError` (`#[non_exhaustive]`), a type separate from `FenError` — this

@@ -109,8 +109,10 @@ pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
         }
     }
     // `SetUp "0"` explicitly declares the standard start; a FEN tag beside it
-    // is stale. Absent `SetUp` doesn't count: many exporters omit it.
-    if setup.as_deref().map(str::trim) == Some("0") {
+    // is stale. Absent `SetUp` doesn't count: many exporters omit it. An empty
+    // FEN tag is an exporter placeholder, like an empty `Variant`.
+    let empty_fen = fen.as_deref().is_some_and(|f| f.trim().is_empty());
+    if empty_fen || setup.as_deref().map(str::trim) == Some("0") {
         fen = None;
     }
     let mut pos = start_position(fen.as_deref(), variant.as_deref())?;
@@ -169,6 +171,13 @@ mod tests {
             })
         );
         assert_eq!(board.side_to_move, Color::Black);
+    }
+
+    #[test]
+    fn empty_fen_tag_means_the_standard_start() {
+        let pgn = "[SetUp \"1\"]\n[FEN \"\"]\n1. e4 e5";
+        assert_eq!(board_at(pgn, 2), board_at("1. e4 e5", 2));
+        assert!(board_at(pgn, 2).is_ok());
     }
 
     #[test]

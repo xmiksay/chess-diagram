@@ -155,6 +155,9 @@ fn tag(s: &str) -> (Tag<'_>, &str) {
         for (i, c) in s.char_indices() {
             let in_string = quote_count % 2 == 1;
             match c {
+                // Even escaped, a newline ends the tag: a stray trailing `\`
+                // must not swallow the next tag pair.
+                '\n' => break 'scan (i, s.get(i..).unwrap_or("")),
                 _ if escaped => escaped = false,
                 '\\' if in_string => escaped = true,
                 '"' => {
@@ -164,7 +167,6 @@ fn tag(s: &str) -> (Tag<'_>, &str) {
                     quote_count += 1;
                 }
                 ']' if !in_string => break 'scan (i, s.get(i + 1..).unwrap_or("")),
-                '\n' => break 'scan (i, s.get(i..).unwrap_or("")),
                 _ => {}
             }
         }
@@ -209,6 +211,11 @@ mod tests {
         assert_eq!(
             tags("[FEN \"8/8 w\n[SetUp]\n[Event \"x\" junk]"),
             [("FEN", "8/8 w"), ("SetUp", ""), ("Event", "x")]
+        );
+        // A trailing backslash escapes nothing across the line break.
+        assert_eq!(
+            tags("[Site \"C:\\\n[FEN \"8/8 w\"]"),
+            [("Site", "C:\\"), ("FEN", "8/8 w")]
         );
     }
 
