@@ -7,46 +7,17 @@
 
 mod castling;
 mod convert;
+mod error;
 mod movetext;
 mod san;
 mod start;
 
-use thiserror::Error;
-
 use crate::board::Board;
 use convert::convert_board;
+pub use error::PgnError;
 use movetext::{tokens, unescape, Token};
 use san::San;
 use start::start_position;
-
-/// Errors from walking a PGN movetext. Kept separate from [`FenError`](crate::FenError)
-/// so the default build's error surface is unaffected by this feature.
-#[derive(Debug, Error, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum PgnError {
-    /// The `FEN` header tag (carried here, unescaped) isn't a valid position
-    /// for the game's variant.
-    #[error("invalid FEN tag {0:?}")]
-    InvalidFen(String),
-    /// The `Variant` header tag (carried here, unescaped) names a variant
-    /// whose move rules differ from standard chess and Chess960.
-    #[error("unsupported variant {0:?}")]
-    UnsupportedVariant(String),
-    /// `ply` asked for more half-moves than the mainline contains.
-    #[error("PGN mainline has {available} ply, requested ply {requested}")]
-    PlyOutOfRange {
-        /// The ply that was requested.
-        requested: usize,
-        /// The number of mainline ply actually present.
-        available: usize,
-    },
-    /// A SAN token in the mainline didn't parse.
-    #[error("invalid SAN token {0:?}")]
-    InvalidSan(String),
-    /// A SAN token parsed but doesn't name a legal move in its position.
-    #[error("illegal move {0:?}")]
-    IllegalMove(String),
-}
 
 /// Walks `pgn`'s mainline to half-move `ply` (`0` = the starting position,
 /// `1` = after the first move, …) and returns the resulting [`Board`].
@@ -60,14 +31,19 @@ pub enum PgnError {
 /// match regardless of case (`[Fen ...]`), and a repeated tag's last value
 /// wins.
 ///
-/// The `Variant` tag selects the rules: absent, empty, standard chess
-/// (`Standard`, `From Position`, …) or a variant with standard move rules
-/// (`Three-check`, `King of the Hill`) plays standard chess; Chess960
+/// The `Variant` tag selects the rules: standard chess (`Standard`,
+/// `From Position`, …) or a variant with standard move rules
+/// (`Three-check`, `King of the Hill`) plays standard chess, as does an
+/// absent or empty tag (unless the FEN implies Chess960, below); Chess960
 /// (`Chess960`, `Chess 960`, `Fischerandom`, …) accepts X-FEN (`KQkq`,
 /// outermost rook) or Shredder-FEN (`HAha`) castling rights and resolves
 /// `O-O`/`O-O-O` by rook side. Names compare ignoring case, whitespace, `-`
 /// and `_`. Without a `FEN` tag Chess960 starts from the standard position
-/// (Chess960 position 518).
+/// (Chess960 position 518). Without a (non-empty) `Variant` tag, a FEN with
+/// a Shredder-FEN castling letter `b`–`g` naming a rook (`GEge`) is read as
+/// Chess960;
+/// `KQkq`/`HAha` never are, since a sloppy standard puzzle FEN looks the
+/// same — add `[Variant "Chess960"]` for such games.
 ///
 /// FEN fields that can't change the board are read leniently: castling rights
 /// the position can't support (a blanket `KQkq` with no rooks, a non-standard

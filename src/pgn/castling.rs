@@ -19,11 +19,7 @@ pub(super) fn with_castling(board: &Board, field: &str, variant: Variant) -> Opt
             if !matches!(letter, 'a'..='h' | 'k' | 'q') {
                 return None;
             }
-            let color = if c.is_ascii_uppercase() {
-                Color::White
-            } else {
-                Color::Black
-            };
+            let color = color_of(c);
             let Some((short, file)) = castling_right(board, color, letter, variant) else {
                 continue;
             };
@@ -38,6 +34,36 @@ pub(super) fn with_castling(board: &Board, field: &str, variant: Variant) -> Opt
         }
     }
     builder.build().ok()
+}
+
+/// The variant a castling field implies on its own, for a FEN exported
+/// without a `Variant` tag: Chess960 when a Shredder letter `b`–`g` (e.g.
+/// `GEge`) names a rook that can castle, else standard. Only those letters
+/// are impossible in a correct standard FEN: puzzle generators write a
+/// blanket `KQkq` (or Shredder `HAha`) whatever the position, so around a
+/// displaced king those look the same in a sloppy standard puzzle and a
+/// real Chess960 FEN, and inferring Chess960 there would grant bogus
+/// castling.
+pub(super) fn implied_variant(board: &Board, field: &str) -> Variant {
+    let chess960_only = field.chars().any(|c| {
+        let letter = c.to_ascii_lowercase();
+        matches!(letter, 'b'..='g')
+            && castling_right(board, color_of(c), letter, Variant::Chess960).is_some()
+    });
+    if chess960_only {
+        Variant::Chess960
+    } else {
+        Variant::Standard
+    }
+}
+
+/// White for an uppercase castling letter, Black otherwise.
+fn color_of(letter: char) -> Color {
+    if letter.is_ascii_uppercase() {
+        Color::White
+    } else {
+        Color::Black
+    }
 }
 
 /// One castling-field letter (`k`, `q`, or a rook's file) → (is it the king
@@ -127,6 +153,37 @@ mod tests {
             "4k3/8/8/8/8/8/8/R3K2R w K1 - 0 1",
         ] {
             assert_eq!(rights(fen, Variant::Chess960), None, "{fen}");
+        }
+    }
+
+    #[test]
+    fn implied_variant_needs_an_inner_file_letter() {
+        let implied = |placement: &str, field: &str| {
+            let board =
+                Board::from_fen(&format!("{placement} w - - 0 1"), false).expect("valid placement");
+            implied_variant(&board, field)
+        };
+        let c960 = "bqnbrkrn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRKRN";
+        assert_eq!(implied(c960, "GEge"), Variant::Chess960);
+        // A stale letter (Black castled, so `g` fits nothing) doesn't undo it.
+        let black_castled = "bqnbrrkn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRKRN";
+        assert_eq!(implied(black_castled, "GEg"), Variant::Chess960);
+        // `K`/`Q` and `A`/`H` never infer: also sloppy standard puzzle shapes.
+        assert_eq!(implied(c960, "KQkq"), Variant::Standard);
+        for placement in ["r3k2r/8/8/8/8/8/8/R4K1R", "r3k2r/8/8/8/8/8/8/5RK1"] {
+            for field in ["KQkq", "HAha"] {
+                assert_eq!(
+                    implied(placement, field),
+                    Variant::Standard,
+                    "{placement} {field}"
+                );
+            }
+        }
+        // A b–g letter naming no rook infers nothing.
+        assert_eq!(implied("r3k2r/8/8/8/8/8/8/R3K2R", "G"), Variant::Standard);
+        // Standard-fitting rights, an empty field, a malformed one.
+        for field in ["KQkq", "HAha", "-", "X"] {
+            assert_eq!(implied("r3k2r/8/8/8/8/8/8/R3K2R", field), Variant::Standard);
         }
     }
 

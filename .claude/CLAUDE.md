@@ -87,10 +87,18 @@ Two layers behind one seam:
   accepting X-FEN (`K`/`Q` = outermost rook, or a file letter) and
   Shredder-FEN; a right the board can't support (no back-rank king/rook,
   or outside Chess960 anything but an e-file king with an a/h rook) is
-  dropped, not an error, since puzzle generators write blanket `KQkq`. A
-  malformed field or a FEN that doesn't parse is `InvalidFen`. `ply` counts from that position. Errors are
-  `PgnError` (`#[non_exhaustive]`), a type separate from `FenError` — this
-  module never touches the parse layer or its error contract.
+  dropped, not an error, since puzzle generators write blanket `KQkq`.
+  Without a `Variant` tag, `implied_variant` picks Chess960 only from a
+  Shredder letter `b`–`g` naming a rook (`GEge`) — the only letters a
+  correct standard FEN can't contain. `K`/`Q`/`A`/`H` never infer: a
+  blanket `KQkq`/`HAha` around a displaced king is identical in a sloppy
+  standard puzzle and a real Chess960 FEN, and guessing Chess960 there
+  grants bogus castling (such tagless 960 games need their `Variant`
+  tag). A malformed field or a FEN that doesn't
+  parse is `InvalidFen`. `ply` counts from that position. Errors are
+  `PgnError` (`error.rs`, `#[non_exhaustive]`), a type separate from
+  `FenError` — this module never touches the parse layer or its error
+  contract.
 - **PNG layer** — `src/png.rs` (`#[cfg(feature = "png")]`, opt-in, implies
   `svg`): `pub fn render_png(fen: &str, opts: &Options) -> Result<Vec<u8>,
   PngError>` calls `render_svg` then rasterises the resulting SVG string with
@@ -137,6 +145,7 @@ Extension seams:
 | 4 | `pgn` backend swap: GPL `shakmaty` → MIT `cozy-chess` + own SAN parser (`src/pgn/san.rs`), same API (0.2.1) | done |
 | 4 | `pgn` SAN: zero-castling `0-0`/`0-0-0` accepted alongside `O-O`/`O-O-O` (forms don't mix) | done |
 | 4 | `pgn` honours `[FEN]`/`[Variant]` header tags (`src/pgn/start.rs`): FEN start position, Chess960 (X-FEN + Shredder-FEN), `PgnError::{InvalidFen, UnsupportedVariant}`, `#[non_exhaustive]` (0.3.0, #50) | done |
+| 4 | `pgn` infers Chess960 without a `Variant` tag from a Shredder castling letter `b`–`g` (`castling::implied_variant`, #57) | done |
 
 ## Build & test
 
