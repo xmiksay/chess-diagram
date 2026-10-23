@@ -31,17 +31,18 @@ pub(super) struct Tag<'a> {
 }
 
 /// Resolves a tag value's `\"` and `\\` escapes, borrowing when it has none.
+/// Those are PGN's only escapes, so any other backslash stays literal.
 pub(super) fn unescape(value: &str) -> Cow<'_, str> {
     if !value.contains('\\') {
         return Cow::Borrowed(value);
     }
     let mut out = String::with_capacity(value.len());
-    let mut chars = value.chars();
+    let mut chars = value.chars().peekable();
     while let Some(c) = chars.next() {
-        out.push(match c {
-            '\\' => chars.next().unwrap_or(c),
-            _ => c,
-        });
+        let escaped = (c == '\\')
+            .then(|| chars.next_if(|&n| n == '"' || n == '\\'))
+            .flatten();
+        out.push(escaped.unwrap_or(c));
     }
     Cow::Owned(out)
 }
@@ -224,6 +225,8 @@ mod tests {
         assert!(matches!(unescape("plain"), Cow::Borrowed("plain")));
         assert_eq!(unescape(r#"x\"y\\z"#), r#"x"y\z"#);
         assert_eq!(unescape("trailing\\"), "trailing\\");
+        // Only `\"` and `\\` are escapes; another backslash is literal.
+        assert_eq!(unescape(r"C:\new\\x"), r"C:\new\x");
     }
 
     #[test]

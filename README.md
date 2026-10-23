@@ -201,7 +201,8 @@ loading — those belong to the consumers.
   A `FEN` header tag (puzzles, endgames — `SetUp` is optional) sets the
   position the walk starts from, and `ply` counts from there. A `Variant` tag
   of standard chess or Chess960 is honoured (Chess960 FENs may use X-FEN
-  `KQkq` or Shredder-FEN `HAha` castling rights); any other variant is
+  `KQkq` or Shredder-FEN `HAha` castling rights), and Three-check / King of
+  the Hill play by standard move rules; any other variant is
   `PgnError::UnsupportedVariant`, and a FEN tag that doesn't parse is
   `PgnError::InvalidFen`.
 
