@@ -53,7 +53,9 @@ use start::start_position;
 /// Only the mainline is walked: comments (`{...}`, `;`), `%` escape lines,
 /// variations (`(...)`), NAGs (`$1`), `!`/`?` suffix annotations, and move
 /// numbers are skipped; a game-result token (`1-0`, `0-1`, `1/2-1/2`, `*`),
-/// or a tag pair after the first move, ends the mainline. Castling is
+/// or a tag pair after the first move or after the blank line that closes
+/// the header section (the next game, even if this one has no moves), ends
+/// the mainline. Castling is
 /// accepted as `O-O`/`O-O-O` or zero-castling `0-0`/`0-0-0`.
 ///
 /// # Errors
@@ -280,6 +282,20 @@ mod tests {
             Err(PgnError::PlyOutOfRange {
                 requested: 3,
                 available: 2
+            })
+        );
+    }
+
+    #[test]
+    fn a_moveless_games_successor_is_not_read_as_it() {
+        let pgn = "[Event \"a\"]\n[FEN \"4k3/8/8/8/8/8/8/4K3 w - - 0 1\"]\n\n[Event \"b\"]\n1. e4";
+        let fen_board = crate::fen::parse("4k3/8/8/8/8/8/8/4K3 w").expect("valid FEN");
+        assert_eq!(board_at(pgn, 0), Ok(fen_board));
+        assert_eq!(
+            board_at(pgn, 1),
+            Err(PgnError::PlyOutOfRange {
+                requested: 1,
+                available: 0
             })
         );
     }
