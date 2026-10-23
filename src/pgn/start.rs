@@ -10,7 +10,7 @@
 
 use cozy_chess::{Board, Square};
 
-use super::castling::with_castling;
+use super::castling::{implied_variant, with_castling};
 use super::PgnError;
 
 /// `Variant` tag spellings played with standard move rules, compared ignoring
@@ -48,10 +48,11 @@ pub(super) fn start_position(fen: Option<&str>, variant: Option<&str>) -> Result
     }
 }
 
-fn parse_variant(tag: Option<&str>) -> Result<Variant, PgnError> {
-    // Some exporters write an empty `Variant` tag; treat it as absent.
+/// `None` when the tag is absent or empty (some exporters write one), which
+/// leaves the variant to the FEN's castling field.
+fn parse_variant(tag: Option<&str>) -> Result<Option<Variant>, PgnError> {
     let Some(tag) = tag.filter(|t| !t.trim().is_empty()) else {
-        return Ok(Variant::Standard);
+        return Ok(None);
     };
     let key: String = tag
         .chars()
@@ -60,16 +61,17 @@ fn parse_variant(tag: Option<&str>) -> Result<Variant, PgnError> {
         .collect();
     let is_one_of = |names: &[&str]| names.contains(&key.as_str());
     if is_one_of(STANDARD) {
-        Ok(Variant::Standard)
+        Ok(Some(Variant::Standard))
     } else if is_one_of(CHESS960) {
-        Ok(Variant::Chess960)
+        Ok(Some(Variant::Chess960))
     } else {
         Err(PgnError::UnsupportedVariant(tag.to_string()))
     }
 }
 
-/// Parses a FEN, its castling field via [`with_castling`].
-fn parse_fen(fen: &str, variant: Variant) -> Option<Board> {
+/// Parses a FEN, its castling field via [`with_castling`]. Without an explicit
+/// variant, the castling field decides (see [`implied_variant`]).
+fn parse_fen(fen: &str, variant: Option<Variant>) -> Option<Board> {
     let mut fields = fen.split_ascii_whitespace();
     let (placement, side, castling, en_passant) = (
         fields.next()?,
@@ -101,6 +103,7 @@ fn parse_fen(fen: &str, variant: Variant) -> Option<Board> {
         .or_else(|_| Board::from_fen(&format!("{placement} {side} - - 0 1"), false))
         .ok()?;
 
+    let variant = variant.unwrap_or_else(|| implied_variant(&board, castling));
     with_castling(&board, castling, variant)
 }
 
@@ -264,11 +267,37 @@ mod tests {
     }
 
     #[test]
+    fn chess960_is_inferred_from_an_unambiguous_castling_field() {
+        let start = "bqnbrkrn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRKRN";
+        let castled = "bqnbrrkn/pppppppp/8/8/8/8/PPPPPPPP/BQNBRRKN w";
+        // No Variant tag: Shredder `GEge`, or X-FEN `KQkq` with an f-file king.
+        for rights in ["GEge", "KQkq"] {
+            let pgn = format!("[FEN \"{start} w {rights} - 0 1\"]\n1. O-O O-O");
+            assert_board(&pgn, 2, castled);
+        }
+        // An explicit standard Variant tag still wins: the rights are dropped.
+        let pgn = format!("[Variant \"Standard\"]\n[FEN \"{start} w GEge - 0 1\"]\n1. O-O");
+        assert_eq!(
+            board_at(&pgn, 1),
+            Err(PgnError::IllegalMove("O-O".to_string()))
+        );
+        // Standard-looking rights stay standard, blanket ones included.
+        assert_board(
+            "[FEN \"4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1\"]",
+            0,
+            "4k3/8/8/8/8/8/8/4K3 w",
+        );
+        let std = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+        let board: Board = std.parse().expect("valid FEN");
+        assert_eq!(implied_variant(&board, "KQkq"), Variant::Standard);
+    }
+
+    #[test]
     fn variant_tag_spellings() {
+        for absent in [None, Some(""), Some(" ")] {
+            assert_eq!(parse_variant(absent), Ok(None));
+        }
         for standard in [
-            None,
-            Some(""),
-            Some(" "),
             Some("Standard"),
             Some("from position"),
             Some("CHESS"),
@@ -276,10 +305,10 @@ mod tests {
             Some("king of the hill"),
             Some("King-of-the-Hill"),
         ] {
-            assert_eq!(parse_variant(standard), Ok(Variant::Standard));
+            assert_eq!(parse_variant(standard), Ok(Some(Variant::Standard)));
         }
         for c960 in ["Chess960", "chess 960", "FischeRandom", "Fischer Random"] {
-            assert_eq!(parse_variant(Some(c960)), Ok(Variant::Chess960));
+            assert_eq!(parse_variant(Some(c960)), Ok(Some(Variant::Chess960)));
         }
         assert_eq!(
             parse_variant(Some("Crazyhouse")),
@@ -289,7 +318,7 @@ mod tests {
 
     #[test]
     fn fen_field_shapes() {
-        let ok = |fen| parse_fen(fen, Variant::Standard).is_some();
+        let ok = |fen| parse_fen(fen, Some(Variant::Standard)).is_some();
         assert!(ok("4k3/8/8/8/8/8/8/4K3 w - -"));
         assert!(ok("4k3/8/8/8/8/8/8/4K3  w  -  -  150  80 "));
         assert!(!ok("4k3/8/8/8/8/8/8/4K3 w - - x 1"));

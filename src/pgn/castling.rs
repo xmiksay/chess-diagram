@@ -19,11 +19,7 @@ pub(super) fn with_castling(board: &Board, field: &str, variant: Variant) -> Opt
             if !matches!(letter, 'a'..='h' | 'k' | 'q') {
                 return None;
             }
-            let color = if c.is_ascii_uppercase() {
-                Color::White
-            } else {
-                Color::Black
-            };
+            let color = color_of(c);
             let Some((short, file)) = castling_right(board, color, letter, variant) else {
                 continue;
             };
@@ -38,6 +34,32 @@ pub(super) fn with_castling(board: &Board, field: &str, variant: Variant) -> Opt
         }
     }
     builder.build().ok()
+}
+
+/// The variant a castling field implies on its own, for a FEN exported
+/// without a `Variant` tag: Chess960 when some right it grants only exists
+/// there (a king off the e-file, or a rook off a/h — e.g. Shredder `GEge`),
+/// else standard. Rights no variant supports (a blanket `KQkq` with no
+/// rooks) imply nothing.
+pub(super) fn implied_variant(board: &Board, field: &str) -> Variant {
+    let chess960_only = field.chars().any(|c| {
+        let right = |variant| castling_right(board, color_of(c), c.to_ascii_lowercase(), variant);
+        right(Variant::Chess960).is_some() && right(Variant::Standard).is_none()
+    });
+    if chess960_only {
+        Variant::Chess960
+    } else {
+        Variant::Standard
+    }
+}
+
+/// White for an uppercase castling letter, Black otherwise.
+fn color_of(letter: char) -> Color {
+    if letter.is_ascii_uppercase() {
+        Color::White
+    } else {
+        Color::Black
+    }
 }
 
 /// One castling-field letter (`k`, `q`, or a rook's file) → (is it the king

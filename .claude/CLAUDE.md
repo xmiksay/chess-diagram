@@ -87,7 +87,10 @@ Two layers behind one seam:
   accepting X-FEN (`K`/`Q` = outermost rook, or a file letter) and
   Shredder-FEN; a right the board can't support (no back-rank king/rook,
   or outside Chess960 anything but an e-file king with an a/h rook) is
-  dropped, not an error, since puzzle generators write blanket `KQkq`. A
+  dropped, not an error, since puzzle generators write blanket `KQkq`.
+  Without a `Variant` tag, `implied_variant` picks Chess960 when a right is
+  supportable only there (king off e, rook off a/h) — safe because rights
+  that fit standard chess resolve identically under both rule sets. A
   malformed field or a FEN that doesn't parse is `InvalidFen`. `ply` counts from that position. Errors are
   `PgnError` (`#[non_exhaustive]`), a type separate from `FenError` — this
   module never touches the parse layer or its error contract.
