@@ -202,13 +202,12 @@ loading — those belong to the consumers.
   position the walk starts from, and `ply` counts from there. A `Variant` tag
   of standard chess or Chess960 is honoured (Chess960 FENs may use X-FEN
   `KQkq` or Shredder-FEN `HAha` castling rights), and Three-check / King of
-  the Hill play by standard move rules. Without a `Variant` tag, a FEN whose
-  Shredder-FEN castling letters include an inner file `b`–`g` (e.g. `GEge`)
-  is read as Chess960 (`KQkq`/`HAha` are not — tag those games). Any
-  other variant is
+  the Hill play by standard move rules; any other variant is
   `PgnError::UnsupportedVariant`, and a FEN tag that doesn't parse is
-  `PgnError::InvalidFen`. Both tag names match regardless of case
-  (`[Fen ...]`).
+  `PgnError::InvalidFen`. Without a (or with an empty) `Variant` tag, a FEN
+  whose Shredder-FEN castling letters include an inner file `b`–`g` naming a
+  back-rank rook (e.g. `GEge`) is read as Chess960 (`KQkq`/`HAha` are not —
+  tag those games). Both tag names match regardless of case (`[Fen ...]`).
 
   With `features = ["png"]` — coordinate labels and text badges use
   `sans-serif`, so this loads the host's system fonts via `fontdb`; exact

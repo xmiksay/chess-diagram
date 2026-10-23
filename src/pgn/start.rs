@@ -273,6 +273,9 @@ mod tests {
         // No Variant tag: Shredder `GEge` is read as Chess960...
         let pgn = format!("[FEN \"{C960_START} w GEge - 0 1\"]\n1. O-O O-O");
         assert_board(&pgn, 2, C960_CASTLED);
+        // ...and so is it under an empty Variant tag (an exporter placeholder).
+        let pgn = format!("[Variant \"\"]\n[FEN \"{C960_START} w GEge - 0 1\"]\n1. O-O O-O");
+        assert_board(&pgn, 2, C960_CASTLED);
         // ...but X-FEN `KQkq` isn't (a sloppy standard puzzle looks the same).
         let pgn = format!("[FEN \"{C960_START} w KQkq - 0 1\"]\n1. O-O");
         assert_eq!(
