@@ -92,7 +92,7 @@ Two layers behind one seam:
   supportable only there (king off e, rook off a/h) — safe because rights
   that fit standard chess resolve identically under both rule sets. A
   malformed field or a FEN that doesn't parse is `InvalidFen`. `ply` counts from that position. Errors are
-  `PgnError` (`#[non_exhaustive]`), a type separate from `FenError` — this
+  `PgnError` (`error.rs`, `#[non_exhaustive]`), a type separate from `FenError` — this
   module never touches the parse layer or its error contract.
 - **PNG layer** — `src/png.rs` (`#[cfg(feature = "png")]`, opt-in, implies
   `svg`): `pub fn render_png(fen: &str, opts: &Options) -> Result<Vec<u8>,
