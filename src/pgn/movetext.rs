@@ -52,16 +52,28 @@ pub(super) fn unescape(value: &str) -> Cow<'_, str> {
 /// variations, NAGs, and `!`/`?` suffix annotations. A game-result token
 /// (`1-0`, `0-1`, `1/2-1/2`, `*`) ends the mainline, and so does a tag pair
 /// once moves have started (a result-less game followed by the next game's
-/// headers), so a second concatenated game is never played onto the first
-/// one's board — nor are its tags read as the first one's.
+/// headers) or after a blank line has closed the header section (a game with
+/// no moves and no result), so a second concatenated game is never played
+/// onto the first one's board — nor are its tags read as the first one's.
 pub(super) fn tokens(pgn: &str) -> impl Iterator<Item = Token<'_>> {
     // Editors on Windows prepend a BOM, which isn't whitespace to `trim_start`.
     let pgn = pgn.strip_prefix('\u{feff}').unwrap_or(pgn);
     let mut rest = pgn;
     let mut variation_depth = 0u32;
-    let mut in_movetext = false;
+    let mut seen_tag = false;
+    // Set by the first move or by a blank line after a tag: any later tag
+    // pair is the next game's.
+    let mut header_over = false;
     std::iter::from_fn(move || loop {
         let trimmed = rest.trim_start();
+        // Latched, so a comment between the blank line and the next game's
+        // tags can't hide it. Only whitespace was trimmed, so two newlines in
+        // that gap are a blank line.
+        if seen_tag && !header_over {
+            header_over = rest
+                .get(..rest.len() - trimmed.len())
+                .is_some_and(|gap| gap.matches('\n').nth(1).is_some());
+        }
         let mut chars = trimmed.chars();
         let Some(first) = chars.next() else {
             rest = "";
@@ -79,13 +91,16 @@ pub(super) fn tokens(pgn: &str) -> impl Iterator<Item = Token<'_>> {
             ';' => skip_line(after),
             // Braces don't nest: a `{` inside a comment is literal text.
             '{' => after.split_once('}').map_or("", |(_, tail)| tail),
-            // Tag pairs only precede movetext, so one after a move is the
-            // next game's header section even if this game lost its result.
-            '[' if variation_depth == 0 && in_movetext => {
+            // Tag pairs only precede movetext, and a blank line ends the tag
+            // section, so a tag after a move or after that blank line is the
+            // next game's header even if this game lost its result (or had
+            // no moves at all).
+            '[' if variation_depth == 0 && header_over => {
                 rest = "";
                 return None;
             }
             '[' if variation_depth == 0 => {
+                seen_tag = true;
                 let (tag, tail) = tag(after);
                 rest = tail;
                 return Some(Token::Tag(tag));
@@ -129,7 +144,7 @@ pub(super) fn tokens(pgn: &str) -> impl Iterator<Item = Token<'_>> {
                 if san.is_empty() {
                     continue;
                 }
-                in_movetext = true;
+                header_over = true;
                 return Some(Token::San(san));
             }
         };
@@ -141,8 +156,10 @@ fn is_delimiter(c: char) -> bool {
     c.is_whitespace() || "{}();[$!?".contains(c)
 }
 
+/// Skips to the end of the line, leaving its newline so a blank line right
+/// after a `;`/`%` comment still reads as one.
 fn skip_line(s: &str) -> &str {
-    s.split_once('\n').map_or("", |(_, tail)| tail)
+    s.find('\n').and_then(|i| s.get(i..)).unwrap_or("")
 }
 
 /// Lexes a `[Name "value"]` tag pair (after its `[`) up to the `]` outside
@@ -251,6 +268,40 @@ mod tests {
         );
         // Inside a variation a `[` is not a header.
         assert_eq!(sans("1. e4 (1. d4 [x]) e5"), ["e4", "e5"]);
+    }
+
+    #[test]
+    fn blank_line_after_tags_ends_a_moveless_game() {
+        let names = |pgn| {
+            tokens(pgn)
+                .map(|t| match t {
+                    Token::Tag(tag) => tag.name,
+                    Token::San(san) => san,
+                })
+                .collect::<Vec<_>>()
+        };
+        // Game a has no moves and no result: game b is not read as its own.
+        assert_eq!(names("[Event \"a\"]\n\n[Event \"b\"]\n1. e4"), ["Event"]);
+        assert_eq!(
+            names("[Event \"a\"]\r\n\r\n[Event \"b\"]\r\n1. e4"),
+            ["Event"]
+        );
+        // One header section (no blank line inside) followed by its movetext.
+        assert_eq!(
+            names("[Event \"a\"]\n[Site \"b\"]\n\n1. e4"),
+            ["Event", "Site", "e4"]
+        );
+        // A blank line before the first tag isn't a header boundary.
+        assert_eq!(names("\n\n[Event \"a\"]\n1. e4"), ["Event", "e4"]);
+        // A comment after the blank line doesn't hide it, nor does a line
+        // comment that ends just before it.
+        assert_eq!(names("[Event \"a\"]\n\n{c}\n[Event \"b\"]"), ["Event"]);
+        assert_eq!(names("[Event \"a\"]\n\n; c\n[Event \"b\"]"), ["Event"]);
+        assert_eq!(names("[Event \"a\"] ; c\n\n[Event \"b\"]"), ["Event"]);
+        assert_eq!(names("[Event \"a\"]\n%x\n\n[Event \"b\"]"), ["Event"]);
+        // The latch doesn't stop a comment-led movetext after the blank line.
+        assert_eq!(names("[Event \"a\"]\n\n{c}\n1. e4"), ["Event", "e4"]);
+        assert_eq!(names("[Event \"a\"]\n\n; c\n%x\n1. e4"), ["Event", "e4"]);
     }
 
     #[test]
