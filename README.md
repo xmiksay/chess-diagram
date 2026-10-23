@@ -204,7 +204,8 @@ loading — those belong to the consumers.
   `KQkq` or Shredder-FEN `HAha` castling rights), and Three-check / King of
   the Hill play by standard move rules; any other variant is
   `PgnError::UnsupportedVariant`, and a FEN tag that doesn't parse is
-  `PgnError::InvalidFen`.
+  `PgnError::InvalidFen`. Both tag names match regardless of case
+  (`[Fen ...]`).
 
   With `features = ["png"]` — coordinate labels and text badges use
   `sans-serif`, so this loads the host's system fonts via `fontdb`; exact

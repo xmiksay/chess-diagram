@@ -68,9 +68,12 @@ Two layers behind one seam:
   `$n` NAGs, `!`/`?` suffix annotations, a leading BOM, move numbers and
   nested `(...)` variations, and stops for good at a result token or at a
   tag pair after the first move (a result-less game's successor — so its
-  tags are never read as this game's). `start.rs` turns the header's `FEN`
-  tag (used whatever `SetUp` says, as python-chess/lichess do; an empty one
-  means the standard start) and `Variant` tag into the starting cozy board:
+  tags are never read as this game's). `board_at` collects the header's
+  `FEN` and `Variant` tags (names matched case-insensitively, so a
+  mis-cased `[Fen]` isn't silently ignored; a repeated tag's last value
+  wins), and `start.rs` turns them into the starting cozy board — the `FEN`
+  tag used whatever `SetUp` says, as python-chess/lichess do; an empty one
+  means the standard start. `Variant` picks
   standard rules (incl. Three-check / King of the Hill, which only change
   the win condition) or Chess960 (spelling lists in `STANDARD`/`CHESS960`,
   matched ignoring case, whitespace, `-` and `_`), anything else

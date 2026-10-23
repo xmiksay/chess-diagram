@@ -56,7 +56,9 @@ pub enum PgnError {
 /// or when the tag is empty — from the standard start position. `ply` counts
 /// from that position, and the side to move follows the FEN's, so a FEN with
 /// Black to move takes Black's move (`1... e5`) as ply 1. Only the header
-/// section before the first move is read.
+/// section before the first move is read. The `FEN` and `Variant` tag names
+/// match regardless of case (`[Fen ...]`), and a repeated tag's last value
+/// wins.
 ///
 /// The `Variant` tag selects the rules: absent, empty, standard chess
 /// (`Standard`, `From Position`, …) or a variant with standard move rules
@@ -105,10 +107,12 @@ pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
     let mut tokens = tokens(pgn).peekable();
     let (mut fen, mut variant) = (None, None);
     while let Some(Token::Tag(tag)) = tokens.next_if(|t| matches!(t, Token::Tag(_))) {
-        match tag.name {
-            "FEN" => fen = Some(unescape(tag.value)),
-            "Variant" => variant = Some(unescape(tag.value)),
-            _ => {}
+        // The spec makes tag names case-sensitive, but a mis-cased `[Fen]`
+        // silently ignored would render the wrong board.
+        if tag.name.eq_ignore_ascii_case("FEN") {
+            fen = Some(unescape(tag.value));
+        } else if tag.name.eq_ignore_ascii_case("Variant") {
+            variant = Some(unescape(tag.value));
         }
     }
     let mut pos = start_position(fen.as_deref(), variant.as_deref())?;
@@ -142,6 +146,24 @@ pub fn board_at(pgn: &str, ply: usize) -> Result<Board, PgnError> {
 mod tests {
     use super::*;
     use crate::board::{Color, Piece, Role, Square};
+
+    #[test]
+    fn fen_and_variant_tag_names_ignore_case() {
+        let expected = crate::fen::parse("8/8/8/8/8/8/4P3/4K2k w").expect("valid FEN");
+        let fen = "8/8/8/8/8/8/4P3/4K2k w - - 0 1";
+        // A repeat differing only in case still counts as the same tag: last wins.
+        for header in [
+            "[Fen \"{f}\"]",
+            "[fen \"{f}\"]",
+            "[FEN \"\"]\n[fEN \"{f}\"]",
+        ] {
+            let pgn = format!("{}\n1. e4", header.replace("{f}", fen));
+            assert_eq!(board_at(&pgn, 0), Ok(expected.clone()), "{pgn}");
+        }
+        let c960 = "[variant \"Chess960\"]\n[FEN \"4k3/8/8/8/8/8/8/5KR1 w K - 0 1\"]\n1. O-O";
+        let castled = crate::fen::parse("4k3/8/8/8/8/8/8/5RK1 b").expect("valid FEN");
+        assert_eq!(board_at(c960, 1), Ok(castled));
+    }
 
     #[test]
     fn ply_zero_is_start_position() {
