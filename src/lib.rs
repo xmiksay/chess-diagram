@@ -55,8 +55,9 @@
 //! - `svg` (default) — [`SvgRenderer`] and [`render_svg`]. Pure Rust, no
 //!   dependencies beyond `thiserror`.
 //! - `pgn` (opt-in) — `pgn::board_at` walks a PGN mainline to a given ply
-//!   via `cozy-chess` (MIT) and an in-crate SAN parser. Not part of the
-//!   default build's dependency tree.
+//!   via `cozy-chess` (MIT) and an in-crate SAN parser, starting from the
+//!   game's `FEN` tag when it has one (standard chess or Chess960). Not part
+//!   of the default build's dependency tree.
 //! - `png` (opt-in, implies `svg`) — `png::render_png` rasterises this
 //!   crate's own SVG output to PNG bytes via `resvg`. Not part of the
 //!   default build's dependency tree.

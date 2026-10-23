@@ -47,7 +47,7 @@ Two layers behind one seam:
 - **PGN layer** — `src/pgn/` (`#[cfg(feature = "pgn")]`, opt-in): `pub fn
   board_at(pgn: &str, ply: usize) -> Result<Board, PgnError>` (`mod.rs`)
   walks a PGN mainline on a `cozy-chess` board and converts its
-  `Color`/`Piece` into this crate's model. `san.rs` is our own SAN parser —
+  `Color`/`Piece` into this crate's model (`convert.rs`). `san.rs` is our own SAN parser —
   grammar deliberately mirrors shakmaty 0.30's `San::from_ascii` (the
   previous, GPL backend) so the swap changed no accepted input or error
   kind, plus zero-castling `0-0`/`0-0-0` added since (digit and letter
@@ -55,16 +55,32 @@ Two layers behind one seam:
   cozy-chess's legal move generator (disambiguation, capture marker,
   promotion must all match; an ambiguous SAN is `IllegalMove`). cozy-chess
   encodes castling as the king capturing its own rook, so `O-O`/`O-O-O`
-  (or `0-0`/`0-0-0`) match that king move and a plain `K` SAN never does. `movetext.rs`'s `mainline_sans` is a
+  (or `0-0`/`0-0-0`) match that king move and a plain `K` SAN never does;
+  the side is the file order of king and rook, which also holds in
+  Chess960 (king on b/g, adjacent rook, a king that doesn't move).
+  `movetext.rs`'s `tokens` is a
   character-level lexer over the PGN (PGN delimiters are self-terminating,
   so a word/line splitter mis-handles glued comments like `e4{best}`): it
-  skips `[Tag "value"]` pairs (quote-aware), `{...}` comments (non-nesting,
+  yields `[Tag "value"]` pairs (quote-aware; the value stays escaped until
+  `unescape`, which borrows when there's nothing to resolve) and SAN
+  tokens, skipping `{...}` comments (non-nesting,
   may span lines), `;` rest-of-line comments, column-0 `%` escape lines,
   `$n` NAGs, `!`/`?` suffix annotations, a leading BOM, move numbers and
   nested `(...)` variations, and stops for good at a result token or at a
-  tag pair after the first move (a result-less game's successor). Errors are
-  `PgnError`, a type separate from `FenError` — this module never touches
-  the parse layer or its error contract.
+  tag pair after the first move (a result-less game's successor — so its
+  tags are never read as this game's). `start.rs` turns the header's `FEN`
+  tag (`SetUp` not required) and `Variant` tag into the starting cozy
+  board: standard or Chess960 (spelling lists in `STANDARD`/`CHESS960`),
+  anything else `UnsupportedVariant`. Its FEN parse rewrites the castling
+  field itself — cozy's X-FEN mode pins `K`/`Q` to the h/a files, wrong in
+  Chess960 — accepting X-FEN (`K`/`Q` = outermost rook, or a file letter)
+  and Shredder-FEN, then `BoardBuilder` validates; standard chess further
+  requires an e-file king with a/h rooks. Clocks are optional and only
+  checked to be numbers (cozy caps the halfmove clock at 100), and the
+  placement must have 8 ranks (cozy accepts fewer). A bad tag is
+  `InvalidFen`. `ply` counts from that position. Errors are
+  `PgnError` (`#[non_exhaustive]`), a type separate from `FenError` — this
+  module never touches the parse layer or its error contract.
 - **PNG layer** — `src/png.rs` (`#[cfg(feature = "png")]`, opt-in, implies
   `svg`): `pub fn render_png(fen: &str, opts: &Options) -> Result<Vec<u8>,
   PngError>` calls `render_svg` then rasterises the resulting SVG string with
@@ -110,6 +126,7 @@ Extension seams:
 | 3 | Theme presets: `Theme::brown()`/`blue()`/`green()` (plain constructors, `Theme` stays hand-constructible) | done |
 | 4 | `pgn` backend swap: GPL `shakmaty` → MIT `cozy-chess` + own SAN parser (`src/pgn/san.rs`), same API (0.2.1) | done |
 | 4 | `pgn` SAN: zero-castling `0-0`/`0-0-0` accepted alongside `O-O`/`O-O-O` (forms don't mix) | done |
+| 4 | `pgn` honours `[FEN]`/`[Variant]` header tags (`src/pgn/start.rs`): FEN start position, Chess960 (X-FEN + Shredder-FEN), `PgnError::{InvalidFen, UnsupportedVariant}`, `#[non_exhaustive]` (0.3.0, #50) | done |
 
 ## Build & test
 
