@@ -15,7 +15,7 @@ jobs:
     name: Check / Test / Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Reads channel + components from rust-toolchain.toml (single source of
       # truth shared with local dev) and caches the build.
@@ -60,7 +60,7 @@ jobs:
           - features: --all-features
             run: cargo test --all-features --all-targets
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
