@@ -150,9 +150,15 @@ mod tests {
     #[test]
     fn fen_and_variant_tag_names_ignore_case() {
         let expected = crate::fen::parse("8/8/8/8/8/8/4P3/4K2k w").expect("valid FEN");
-        for name in ["Fen", "fen"] {
-            let pgn = format!("[{name} \"8/8/8/8/8/8/4P3/4K2k w - - 0 1\"]\n1. e4");
-            assert_eq!(board_at(&pgn, 0), Ok(expected.clone()));
+        let fen = "8/8/8/8/8/8/4P3/4K2k w - - 0 1";
+        // A repeat differing only in case still counts as the same tag: last wins.
+        for header in [
+            "[Fen \"{f}\"]",
+            "[fen \"{f}\"]",
+            "[FEN \"\"]\n[fEN \"{f}\"]",
+        ] {
+            let pgn = format!("{}\n1. e4", header.replace("{f}", fen));
+            assert_eq!(board_at(&pgn, 0), Ok(expected.clone()), "{pgn}");
         }
         let c960 = "[variant \"Chess960\"]\n[FEN \"4k3/8/8/8/8/8/8/5KR1 w K - 0 1\"]\n1. O-O";
         let castled = crate::fen::parse("4k3/8/8/8/8/8/8/5RK1 b").expect("valid FEN");
